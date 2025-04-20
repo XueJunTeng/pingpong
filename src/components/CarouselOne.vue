@@ -5,17 +5,23 @@
     @mouseenter="carouselStore.stopAutoPlay"
     @mouseleave="() => carouselStore.startAutoPlay(3000)"
   >
-    <div
+  <div
       v-for="(item, index) in carouselStore.items"
       :key="item.id"
       class="carousel-item"
       :class="{ active: index === carouselStore.currentIndex }"
     >
-      <img
-        :src="item.imageUrl"
-        :alt="item.altText"
-        class="carousel-img"
+      <a
+        :href="item.linkUrl"
+        target="_blank"
+        class="carousel-link"
       >
+        <img
+          :src="item.imageUrl"
+          :alt="item.altText"
+          class="carousel-img"
+        >
+      </a>
     </div>
 
     <div class="carousel-controls">

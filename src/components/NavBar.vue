@@ -27,6 +27,9 @@
       <router-link to="/notifications" class="menu-item">
         <span class="icon">🔔</span>
         <span class="text">消息</span>
+        <span v-if="unreadTotal > 0" class="notification-badge">
+          {{ unreadTotal > 99 ? '99+' : unreadTotal }}
+        </span>
       </router-link>
       <router-link to="/Article" class="menu-item">
         <span class="icon">📜</span>
@@ -45,7 +48,12 @@
 import { useAuthStore } from '@/stores/auth'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import { useNotificationsStore } from '@/stores/notifications'
+const notificationsStore = useNotificationsStore()
+const { unreadTotal } = storeToRefs(notificationsStore)
+
+
 const authStore = useAuthStore()
 const { currentUser } = storeToRefs(authStore)
 const router = useRouter()
@@ -68,6 +76,11 @@ const handleSearch = () => {
     searchInput.value.value = ''
   }
 }
+
+onMounted(async () => {
+    await notificationsStore.fetchUnreadCount()
+    console.log('未读数:', unreadTotal.value) // 调试输出
+})
 </script>
 
 <style lang="scss" scoped>
@@ -218,5 +231,32 @@ const handleSearch = () => {
       }
     }
   }
+}
+.menu-item {
+  position: relative;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: #ff4d4f;
+  color: white;
+  height: 18px;
+  min-width: 18px;
+  border-radius: 9px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 </style>

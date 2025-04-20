@@ -22,7 +22,7 @@ export const useHistoryStore = defineStore('history', () => {
     hasNext: false
   })
 
-  const fetchHistory = async (type: HistoryType, page = 1, pageSize = 10) => {
+  const fetchHistory = async (type: HistoryType, page:number, pageSize:number) => {
     try {
       loading.value = true
       currentType.value = type
@@ -37,9 +37,7 @@ export const useHistoryStore = defineStore('history', () => {
       const items = response.data.list.map(mapApiToVideoItem)
 
       // 分页处理逻辑
-      historyList.value = page === 1
-        ? items
-        : [...historyList.value, ...items]
+      historyList.value = items
 
       // 更新分页状态
       pagination.value = {

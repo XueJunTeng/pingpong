@@ -18,6 +18,19 @@ export const useAuthStore = defineStore('auth', {
   }),
 
   actions: {
+    async userlogout() {
+      // 清除客户端所有认证痕迹
+      localStorage.removeItem('token')
+      sessionStorage.clear()
+
+      // 清除 Cookies（如果使用）
+      document.cookie = 'token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;'
+
+      // 清除内存中的 token
+      this.token = ''
+      this.userInfo = null
+      console.log('用户已注销，所有认证信息已清除')
+    },
     // 注册操作（保持不变）
     async register(data: RegisterData) {
       console.debug('[Auth] 注册请求参数:', data)

@@ -1,6 +1,7 @@
 <template>
   <div class="user-center-container">
     <!-- 左侧导航 -->
+    <!-- 左侧导航 -->
     <div class="nav-sidebar">
       <div class="sidebar-header">
         <h2>用户中心</h2>
@@ -10,6 +11,7 @@
         @select="handleTabChange"
         class="user-center-menu"
       >
+        <!-- 原有菜单项 -->
         <el-menu-item index="profile">
           <el-icon><User /></el-icon>
           <span>个人资料</span>
@@ -27,6 +29,12 @@
           <el-menu-item index="history-like">点赞记录</el-menu-item>
           <el-menu-item index="history-favorite">收藏记录</el-menu-item>
         </el-sub-menu>
+
+        <!-- 退出登录按钮 -->
+        <el-menu-item index="logout" @click="handleLogout">
+          <el-icon><SwitchButton /></el-icon>
+          <span style="color: #ff4d4f">退出登录</span>
+        </el-menu-item>
       </el-menu>
     </div>
 
@@ -173,6 +181,8 @@ import type { UploadRequestOptions } from 'element-plus/es/components/upload/src
 import { useHistoryStore } from '@/stores/history'
 import type { HistoryType } from '@/stores/history'
 import ArticleCard from '@/components/ArticleCard.vue'
+import { ElMessageBox } from 'element-plus'
+import router from '@/router'
 const historyStore = useHistoryStore()
 // 类型定义
 type HistoryTab = 'profile' | 'security' | 'history-view' | 'history-like' | 'history-favorite'
@@ -323,12 +333,10 @@ const currentPage = computed({
   set: (value) => historyStore.pagination.page = value
 })
 const pageSize = computed(() => historyStore.pagination.pageSize)
+
 // 修改加载历史记录方法
 const loadHistoryData = async () => {
   try {
-    // 清空旧数据
-    historyStore.clearHistory()
-
     const historyType = getHistoryType(activeTab.value)
     await historyStore.fetchHistory(historyType, currentPage.value, pageSize.value)
   } catch (err) {
@@ -352,13 +360,46 @@ const getHistoryType = (tab: HistoryTab): HistoryType => {
 
 // 修改 tab 切换处理
 const handleTabChange = (key: HistoryTab) => {
-  activeTab.value = key
   if (key.startsWith('history')) {
-    currentPage.value = 1 // 切换分类时重置页码
+    historyStore.clearHistory()
+    currentPage.value = 1
+    activeTab.value = key
     loadHistoryData()
+  } else {
+    activeTab.value = key
   }
 }
 
+// 退出登录处理
+const handleLogout = async () => {
+  try {
+    // 确认对话框
+    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      confirmButtonText: '确定退出',
+      cancelButtonText: '取消',
+      type: 'warning',
+      customClass: 'logout-confirm-dialog',
+      confirmButtonClass: 'confirm-danger-btn',
+      cancelButtonClass: 'cancel-safe-btn'
+    })
+
+    // 执行退出逻辑
+    await authStore.userlogout()
+
+    // 跳转到登录页
+    router.replace({ name: 'Login' })
+
+    // 显示成功提示
+    ElMessage.success({
+      message: '已安全退出系统',
+      duration: 2000
+    })
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (error) {
+    // 用户取消退出时不处理
+    console.log('退出操作已取消')
+  }
+}
 // 生命周期
 onMounted(() => {
   if (activeTab.value.startsWith('history')) {
@@ -368,6 +409,54 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+// 退出按钮动画
+@keyframes shake {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(15deg); }
+  50% { transform: rotate(0deg); }
+  75% { transform: rotate(-15deg); }
+  100% { transform: rotate(0deg); }
+}
+
+// 移动端适配
+@media (max-width: 768px) {
+  .user-center-container {
+    .nav-sidebar {
+      :deep(.el-menu-item[data-index="logout"]) {
+        position: static;
+        border-top: none;
+
+        span {
+          font-size: 14px;
+        }
+      }
+    }
+  }
+}
+
+// 对话框自定义样式
+:global(.logout-confirm-dialog) {
+  .el-message-box__content {
+    padding: 20px;
+  }
+
+  .confirm-danger-btn {
+    background-color: #ff4d4f;
+    border-color: #ff4d4f;
+
+    &:hover {
+      background-color: #ff7875;
+      border-color: #ff7875;
+    }
+  }
+
+  .cancel-safe-btn {
+    &:hover {
+      color: #409eff;
+      border-color: #c6e2ff;
+    }
+  }
+}
 .user-center-container {
   display: flex;
   max-width: 1200px;
@@ -377,6 +466,7 @@ onMounted(() => {
   box-shadow: 0 2px 4px rgba(0,0,0,.1);
 
   .nav-sidebar {
+    position: relative; // 为绝对定位子元素提供基准
     width: 240px;
     border-right: 1px solid #e7e7e7;
 
@@ -390,7 +480,26 @@ onMounted(() => {
         color: #212121;
       }
     }
+    :deep(.el-menu-item[data-index="logout"]) {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      border-top: 1px solid #eee;
+      transition: all 0.3s ease;
 
+      &:hover {
+        background-color: #fff5f5 !important;
+
+        span {
+          color: #ff4d4f !important;
+          font-weight: 500;
+        }
+
+        .el-icon {
+          animation: shake 0.5s ease;
+        }
+      }
+    }
     .user-center-menu {
       border-right: none;
 

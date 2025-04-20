@@ -4,11 +4,11 @@
     <div class="nav-container">
       <div class="nav-left">
         <router-link
-          to="/hot"
+          to="/articles"
           class="nav-title"
           active-class="active"
         >
-          🔥 热门
+          🏓 PingPongPro
         </router-link>
       </div>
 

@@ -5,6 +5,7 @@ interface CarouselItem {
   id: number
   imageUrl: string
   altText: string
+  linkUrl: string  // 新增链接字段
 }
 
 export const useCarouselStore = defineStore('carousel', {

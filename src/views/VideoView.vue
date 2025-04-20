@@ -1,4 +1,3 @@
-<!-- src/views/VideoView.vue -->
 <template>
   <div class="video-page">
     <div class="container">
@@ -14,101 +13,111 @@
         <button @click="retry" class="bilibili-btn primary">重新加载</button>
       </div>
 
-       <!-- 视频详情 -->
-       <div v-else-if="videoStore.currentVideo" class="bilibili-container">
-        <!-- 视频播放器 -->
-        <div class="video-player-container">
-        <video
-        controls
-        class="bilibili-player"
-        poster="https://s1.hdslb.com/bfs/static/jinkela/video/asserts/poster.png"
-        >
-        <source :src="videoStore.currentVideo.url" type="video/mp4">
-        </video>
-        </div>
-
-        <!-- 视频信息 -->
-        <div class="video-info-container">
-          <h1 class="video-title">{{ videoStore.currentVideo.title }}</h1>
-
-          <!-- 作者行 -->
-          <div class="author-row">
-            <div class="author-info">
-              <img
-                :src="videoStore.currentVideo.author"
-                class="author-avatar"
-                alt="作者头像"
+      <!-- 视频详情 -->
+      <div v-else-if="videoStore.currentVideo" class="bilibili-container">
+        <div class="detail-layout">
+          <!-- 左侧主内容 -->
+          <div class="main-content">
+            <!-- 视频播放器 -->
+            <div class="video-player-container">
+              <video
+                controls
+                class="bilibili-player"
+                poster="https://s1.hdslb.com/bfs/static/jinkela/video/asserts/poster.png"
               >
-              <div class="author-meta">
-                <span class="author-name">{{ videoStore.currentVideo.author }}</span>
-                <span class="followers">1.2万粉丝</span>
+                <source :src="videoStore.currentVideo.url" type="video/mp4">
+              </video>
+            </div>
+
+            <!-- 视频信息 -->
+            <div class="video-info-container">
+              <h1 class="video-title">{{ videoStore.currentVideo.title }}</h1>
+
+              <!-- 作者行 -->
+              <div class="author-row">
+                <div class="author-info">
+                  <img
+                    :src="videoStore.currentVideo.author"
+                    class="author-avatar"
+                    alt="作者头像"
+                  >
+                  <div class="author-meta">
+                    <span class="author-name">{{ videoStore.currentVideo.author }}</span>
+                  </div>
+                </div>
+                <div class="action-buttons">
+                  <button
+                    class="bilibili-btn like-btn"
+                    :class="{ 'active': videoStore.currentVideo.isLiked }"
+                    @click="handleLike"
+                  >
+                    <div class="btn-icon">👍</div>
+                    <div class="btn-text">
+                      {{ videoStore.currentVideo.likes || '点赞' }}
+                    </div>
+                  </button>
+                  <button
+                    class="bilibili-btn favorite-btn"
+                    :class="{ 'active': videoStore.currentVideo.isFavorited }"
+                    @click="handleFavorite"
+                  >
+                    <div class="btn-icon">⭐</div>
+                    <div class="btn-text">
+                      {{ videoStore.currentVideo.favorites || '收藏' }}
+                    </div>
+                  </button>
+                </div>
               </div>
-              <button class="bilibili-btn follow-btn">关注</button>
+
+              <!-- 数据信息行 -->
+              <div class="stats-row">
+                <div class="stats-item">
+                  <i class="fas fa-play"></i>
+                  播放 {{ videoStore.currentVideo.views.toLocaleString() }}
+                </div>
+                <div class="stats-item">
+                  <i class="fas fa-clock"></i>
+                  {{ videoStore.currentVideo.uploadTime || '2023-12-20' }}
+                </div>
+                <div class="tags">
+                  <span
+                    v-for="(tag, index) in videoStore.currentVideo.tagsname"
+                    :key="index"
+                    class="tag"
+                  >
+                    {{ tag }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- 简介 -->
+              <div class="description" v-if="videoStore.currentVideo.description">
+                {{ videoStore.currentVideo.description }}
+              </div>
             </div>
-            <div class="action-buttons">
-              <button
-                class="bilibili-btn like-btn"
-                :class="{ 'active': videoStore.currentVideo.isLiked }"
-                @click="handleLike"
-              >
-                <i class="fas fa-thumbs-up"></i>
-                {{ videoStore.currentVideo.likes || '点赞' }}
-              </button>
-              <button
-                class="bilibili-btn favorite-btn"
-                :class="{ 'active': videoStore.currentVideo.isFavorited }"
-                @click="handleFavorite"
-              >
-                <i class="fas fa-star"></i>
-                {{ videoStore.currentVideo.favorites || '收藏' }}
-              </button>
-            </div>
+
+            <!-- 评论区 -->
+            <CommentSection
+              :content-id="Number(route.params.contentId)"
+              class="comment-section"
+            />
           </div>
 
-          <!-- 数据信息行 -->
-          <div class="stats-row">
-            <div class="stats-item">
-              <i class="fas fa-play"></i>
-              播放 {{ videoStore.currentVideo.views.toLocaleString() }}
-            </div>
-            <div class="stats-item">
-              <i class="fas fa-clock"></i>
-              {{ videoStore.currentVideo.uploadTime || '2023-12-20' }}
-            </div>
-            <div class="tags">
-              <span
-                v-for="(tag, index) in videoStore.currentVideo.tagsname"
-                :key="index"
-                class="tag"
-              >
-                {{ tag }}
-              </span>
-            </div>
-          </div>
-
-          <!-- 简介 -->
-          <div class="description" v-if="videoStore.currentVideo.description">
-            {{ videoStore.currentVideo.description }}
-          </div>
-
+          <!-- 右侧推荐列表 -->
+          <RecommendList />
         </div>
-
-        <!-- 评论区 -->
-        <CommentSection
-          :content-id="Number(route.params.contentId)"
-          class="comment-section"
-        />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useVideoStore } from '@/stores/videoStore'
-import CommentSection from '@/components/CommentSection.vue'
 import { useAuthStore } from '@/stores/auth'
+import CommentSection from '@/components/CommentSection.vue'
+import RecommendList from '@/components/VideoRecommendList.vue'
 
 const route = useRoute()
 const videoStore = useVideoStore()
@@ -122,7 +131,9 @@ onMounted(() => {
   const contentId = Number(route.params.contentId)
   videoStore.fetchVideoDetail(contentId)
 })
-
+watch(() => route.params.contentId, (newId) => {
+  videoStore.fetchVideoDetail(Number(newId));
+});
 const handleLike = () => {
   if (!authStore.isAuthenticated) {
     alert('请先登录后再进行点赞操作')
@@ -148,12 +159,11 @@ const handleFavorite = () => {
 }
 
 .container {
-  max-width: 1160px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 0 20px;
 }
 
-/* 加载状态 */
 .loading {
   text-align: center;
   padding: 40px;
@@ -166,7 +176,6 @@ const handleFavorite = () => {
   }
 }
 
-/* 错误提示 */
 .error-card {
   background: #fff;
   border-radius: 8px;
@@ -187,12 +196,13 @@ const handleFavorite = () => {
   }
 }
 
-/* 视频播放器 */
 .video-player-container {
   background: #000;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-width: 960px;
+  margin: 0 auto;
 
   .bilibili-player {
     width: 100%;
@@ -209,9 +219,27 @@ const handleFavorite = () => {
   }
 }
 
-/* 视频信息 */
 .video-info-container {
   padding: 20px 0;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 960px) 300px;
+  gap: 40px;
+  justify-content: center;
+}
+
+.main-content {
+  grid-column: 2;
+}
+
+.recommend-list {
+  grid-column: 3;
+  justify-self: end;
+  width: 300px;
 }
 
 .author-row {
@@ -233,7 +261,7 @@ const handleFavorite = () => {
     height: 40px;
     border-radius: 50%;
     object-fit: cover;
-    background: #e7e7e7; // 添加加载背景色
+    background: #e7e7e7;
   }
 
   .author-meta {
@@ -245,77 +273,72 @@ const handleFavorite = () => {
       font-weight: 500;
       color: #212121;
     }
-
-    .followers {
-      font-size: 12px;
-      color: #999;
-    }
-  }
-
-  .follow-btn {
-    padding: 4px 16px;
-    border-radius: 4px;
-    margin-left: 12px;
-    background: #00a1d6;
-    color: white;
-    border: none;
-    transition: background 0.2s;
-
-    &:hover {
-      background: #00b5e5;
-    }
   }
 }
 
-/* 通用按钮样式 */
+/* 修改后的按钮样式 */
 .bilibili-btn {
+  /* 原有基础样式 */
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  padding: 8px 20px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  border-radius: 8px;
   border: 1px solid #e7e7e7;
   background: #fff;
   color: #666;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
+  transition: all 0.2s ease-in-out;
+  min-width: 72px;
 
   &:hover {
     background: #f8f8f8;
     border-color: #d2d2d2;
   }
 
-  i {
-    margin-right: 6px;
-    font-size: 16px;
-  }
-
-  /* 关注按钮特化 */
-  &.follow-btn {
-    border: none;
-    padding: 4px 16px;
-    background: #00a1d6;
-    color: white;
-
-    &:hover {
-      background: #00b5e5;
-    }
-  }
-
-  /* 激活状态 */
+  /* 增强激活状态优先级 */
   &.active {
-    color: #fff;
-    border-color: transparent;
+    color: #fff !important;
+    border-color: transparent !important;
+    transform: scale(1.05);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
 
+    /* 点赞按钮 */
     &.like-btn {
-      background: #00a1d6;
+      background: #00a1d6 !important;
+      animation: pulse-blue 0.4s ease;
     }
 
+    /* 收藏按钮 */
     &.favorite-btn {
-      background: #ff7ead;
+      background: #ff69b4 !important;
+      animation: pulse-pink 0.4s ease;
+    }
+
+    .btn-icon {
+      filter: brightness(120%);
+      transform: scale(1.2);
     }
   }
+
+  .btn-icon {
+    font-size: 24px;
+    transition: all 0.2s ease;
+  }
+}
+
+/* 添加颜色脉冲动画 */
+@keyframes pulse-blue {
+  0% { box-shadow: 0 0 0 0 rgba(0, 161, 214, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(0, 161, 214, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 161, 214, 0); }
+}
+
+@keyframes pulse-pink {
+  0% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 105, 180, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0); }
 }
 
 .action-buttons {
@@ -323,7 +346,6 @@ const handleFavorite = () => {
   gap: 12px;
 }
 
-/* 数据信息行 */
 .stats-row {
   display: flex;
   align-items: center;
@@ -363,7 +385,6 @@ const handleFavorite = () => {
   }
 }
 
-/* 简介 */
 .description {
   margin: 16px 0;
   padding: 12px;
@@ -374,12 +395,33 @@ const handleFavorite = () => {
   font-size: 14px;
 }
 
-/* 评论区 */
 .comment-section {
   margin-top: 20px;
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-/* 移动端适配 */
+@media (max-width: 1280px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+    padding: 0 20px;
+
+    .recommend-list {
+      grid-column: 1;
+      justify-self: stretch;
+      width: 100%;
+      margin-top: 40px;
+      order: 1;
+    }
+  }
+
+  .video-player-container,
+  .video-info-container {
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 0 12px;
@@ -414,6 +456,11 @@ const handleFavorite = () => {
   .bilibili-btn {
     font-size: 13px;
     padding: 6px 12px;
+    min-width: 64px;
+
+    .btn-icon {
+      font-size: 20px;
+    }
   }
 }
 </style>

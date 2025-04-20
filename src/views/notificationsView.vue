@@ -111,7 +111,7 @@ import { ChatDotRound, Goods } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
 import request from '@/api/request'
-
+import { useNotificationsStore } from '@/stores/notifications'
 interface Notification {
   notificationId: number
   senderId: number
@@ -172,13 +172,8 @@ watch(() => route.query.type, (newType) => {
 // 方法
 const handleTabChange = (tab: string) => {
   activeTab.value = tab
-  currentPage.value = 1 // 重置分页
-  filterNotifications() // 触发过滤
-}
-
-const handlePageChange = (page: number) => {
-  currentPage.value = page
-  filterNotifications() // 触发过滤
+  currentPage.value = 1
+  filterNotifications()
 }
 
 const formatTime = (time: string) => {
@@ -186,20 +181,16 @@ const formatTime = (time: string) => {
 }
 
 const navigateToContent = (item: Notification) => {
-  // 双重校验确保数据有效性
   if (!item.contentId || !item.contentType) {
     console.warn('缺少必要的内容参数', item)
     return ElMessage.warning('内容参数不完整')
   }
 
-  // 定义内容类型路由映射
   const CONTENT_TYPE_ROUTES = {
     article: 'ArticleDetail',
     video: 'VideoDetail',
-    // 可扩展其他类型
   } as const
 
-  // 获取路由配置（带类型校验）
   const routeName = CONTENT_TYPE_ROUTES[item.contentType.toLowerCase() as keyof typeof CONTENT_TYPE_ROUTES]
 
   if (!routeName) {
@@ -207,7 +198,6 @@ const navigateToContent = (item: Notification) => {
     return ElMessage.error('暂不支持该内容类型')
   }
 
-  // 执行路由跳转
   router.push({
     name: routeName,
     params: {
@@ -215,37 +205,71 @@ const navigateToContent = (item: Notification) => {
     }
   })
 }
+// 新增批量标记方法
+const markBatchAsRead = async (ids: number[]) => {
+  if (ids.length === 0) return
 
-// 加载所有通知数据
-const loadNotifications = async () => {
   try {
-    loading.value = true
-    const response = await request.get<Notification[]>('/api/notifications') // 直接定义为数组
+    // 调用批量标记API
+    await request.post('/api/notifications/batch-read', { ids })
 
-    if (Array.isArray(response.data)) { // 验证是否为数组
-      allNotifications.value = response.data.map(item => ({
-        ...item,
-        type: item.type.toUpperCase() as 'LIKE' | 'REPLY' | 'COMMENT'
-      }))
-      filterNotifications()
-    } else {
-      console.warn('响应数据不是数组')
-    }
+    // 更新本地未读数
+    const currentUnread = notificationsStore.unreadTotal - ids.length
+    notificationsStore.setUnreadTotal(Math.max(currentUnread, 0))
+
   } catch (error) {
-    console.error('加载数据时发生错误:', error)
-    allNotifications.value = []
-    ElMessage.error('数据加载失败')
-  } finally {
-    loading.value = false
-    console.log('加载流程结束')
+    console.error('批量标记已读失败:', error)
+    ElMessage.error('标记已读失败')
   }
 }
 
 
+// 修改分页切换处理
+const handlePageChange = async (page: number) => {
+  currentPage.value = page
+  await loadNotifications() // 加载新页时自动标记
+}
+
+// 初始化加载
+onMounted(() => {
+  loadNotifications()
+})
+
+// 修改后的加载方法
+const loadNotifications = async () => {
+  try {
+    loading.value = true
+    const response = await request.get<{
+      list: Notification[]
+      total: number
+    }>('/api/notifications', {
+      params: {
+        page: currentPage.value,
+        pageSize: pageSize.value
+      }
+    })
+
+    allNotifications.value = response.data.list
+    total.value = response.data.total
+    // 自动标记当前页为已读
+    const currentPageIds = response.data.list.map(n => n.notificationId)
+    await markBatchAsRead(currentPageIds)
+    filterNotifications()
+  } catch (error) {
+    console.error('加载数据时发生错误:', error)
+    ElMessage.error('数据加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+
+
+const notificationsStore = useNotificationsStore()
 const filterNotifications = () => {
   if (!Array.isArray(allNotifications.value)) return
 
-  // 按类型过滤
+  // 前端过滤逻辑保持不变
   const filtered = allNotifications.value.filter(item => {
     if (activeTab.value === 'REPLY_AND_COMMENT') {
       return item.type === 'REPLY' || item.type === 'COMMENT'
@@ -253,15 +277,9 @@ const filterNotifications = () => {
     return item.type === activeTab.value
   })
 
-  // 分页处理
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  filteredNotifications.value = filtered.slice(start, end)
+  filteredNotifications.value = filtered
 
-  // 更新总数
-  total.value = filtered.length
-
-  // 更新未读数（根据实际数据结构调整）
+  // 更新未读数
   counts.value.replyComment = allNotifications.value.filter(n =>
     ['REPLY', 'COMMENT'].includes(n.type) && !n.isRead
   ).length
@@ -272,6 +290,7 @@ const filterNotifications = () => {
 </script>
 
 <style scoped lang="scss">
+/* 样式部分保持不变 */
 .notifications-container {
   display: flex;
   max-width: 1200px;
