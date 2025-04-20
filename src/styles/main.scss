@@ -1,0 +1,21 @@
+@import './variables';
+
+// 通用样式
+body {
+  margin: 0;
+  padding: 0;
+  }
+  
+  .container {
+    max-width: 1200px; /* 限制内容宽度 */
+    margin: 0 auto; /* 居中布局 */
+  }
+
+// 工具类
+@mixin ellipsis($line: 1) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: $line;
+  -webkit-box-orient: vertical;
+}
