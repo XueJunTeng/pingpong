@@ -11,7 +11,7 @@
         <router-link to="/" class="home-button">
           返回首页
         </router-link>
-        <button @click="logout" class="logout-button">
+        <button @click="logout"  class="logout-button">
           切换账户
         </button>
       </div>
@@ -20,12 +20,21 @@
 </template>
 
 <script setup lang="ts">
+import router from '@/router'
 import { useAuthStore } from '@/stores/auth'
+import { ElMessage } from 'element-plus'
 
 const authStore = useAuthStore()
 
 const logout = () => {
-  authStore.logout()
+  authStore.userlogout()
+  // 跳转到登录页
+  router.replace({ name: 'Login' })
+  // 显示成功提示
+  ElMessage.success({
+  message: '已安全退出系统',
+  duration: 2000
+})
 }
 </script>
 

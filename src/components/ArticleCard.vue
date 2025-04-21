@@ -13,7 +13,6 @@
         <span class="author">@{{ article.author }}</span>
         <div class="stats">
           <span class="read">👁 {{ article.views.toLocaleString() }}</span>
-          <span class="comments">💬 {{ article.comments.toLocaleString() }}</span>
           <span class="likes">👍 {{ article.likes.toLocaleString() }}</span>
           <span class="likes">⭐ {{ article.favorites.toLocaleString() }}</span>
         </div>

@@ -2,7 +2,9 @@
 <template>
   <div class="admin-container">
     <aside class="admin-sidebar">
-      <h2>管理导航</h2>
+      <router-link to="/admin" class="sidebar-title">
+        <h2>管理导航</h2>
+      </router-link>
       <nav>
         <router-link
           v-for="link in adminLinks"
@@ -45,17 +47,30 @@ const adminLinks = ref([
     name: '标签管理',
     icon: 'fas fa-file-tags',
     meta: { title: '内容审核' }
-  },
-  {
-    path: '/admin/analytics',
-    name: '数据统计',
-    icon: 'fas fa-chart-line',
-    meta: { title: '数据统计' }
   }
 ])
 </script>
 
 <style scoped>
+/* 新增标题链接样式 */
+.sidebar-title {
+  display: block;
+  color: white;
+  text-decoration: none;
+  margin-bottom: 20px;
+}
+
+.sidebar-title h2 {
+  margin: 0;
+  padding: 12px;
+  border-radius: 6px;
+  transition: all 0.3s;
+}
+
+.sidebar-title:hover h2 {
+  background-color: #34495e;
+  cursor: pointer;
+}
 .admin-container {
   display: flex;
   min-height: 100vh;

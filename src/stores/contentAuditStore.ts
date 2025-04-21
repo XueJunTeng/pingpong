@@ -4,6 +4,14 @@ import { ref } from 'vue'
 import type { ContentStatus, ContentItem, PaginatedContentResponse } from '@/types/content'
 import { api } from '@/api'
 
+// 新增类型定义
+interface FetchParams {
+  page?: number
+  pageSize?: number
+  keyword?: string
+  contentType?: string
+}
+
 interface PaginationResponse extends PaginatedContentResponse {
   navigatePages: number
   navigatepageNums: number[]
@@ -30,14 +38,18 @@ export const useContentAuditStore = defineStore('contentAudit', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  // 核心 API 方法
-  const fetchPendingContents = async (page = 1, pageSize = 10) => {
+  // 修改后的 API 方法，支持搜索参数
+  const fetchPendingContents = async (params: FetchParams = {}) => {
     try {
       loading.value = true
+      const { page = 1, pageSize = 10, keyword, contentType } = params
+
       const response = await api.get<PaginationResponse>('/api/admin/contents/pending', {
         params: {
           page,
-          pageSize
+          pageSize,
+          keyword,
+          type: contentType // 根据后端 API 字段名称调整
         }
       })
 
@@ -48,7 +60,6 @@ export const useContentAuditStore = defineStore('contentAudit', () => {
           author: item.author,
           createdTime: formatDateTime(item.createdTime),
           lastModifiedTime: formatDateTime(item.lastModifiedTime),
-          // 直接使用原始类型，无需转换
           type: item.type
         }))
       )
@@ -63,7 +74,7 @@ export const useContentAuditStore = defineStore('contentAudit', () => {
     }
   }
 
-  // 更新分页信息
+  // 更新分页信息（保持不变）
   const updatePagination = (data: PaginationResponse) => {
     pagination.value = {
       page: data.pageNum,
@@ -73,8 +84,6 @@ export const useContentAuditStore = defineStore('contentAudit', () => {
       hasNext: data.hasNextPage
     }
   }
-
-
 
   // 审核操作（保持原样）
   const auditContent = async (
@@ -103,44 +112,13 @@ export const useContentAuditStore = defineStore('contentAudit', () => {
     }
   }
 
-  // 重新计算分页
+  // 重新计算分页（保持不变）
   const recalculatePages = () => {
     pagination.value.pages = Math.ceil(pagination.value.total / pagination.value.pageSize)
     pagination.value.hasNext = pagination.value.page < pagination.value.pages
   }
 
-  // 批量审核
-  const batchAudit = async (
-    contentIds: number[],
-    status: Exclude<ContentStatus, 'PENDING'>,
-    reviewNotes?: string
-  ) => {
-    try {
-      await api.post('/api/admin/contents/batch-review', {
-        contentIds,
-        status,
-        reviewNotes
-      })
-
-      // 更新本地数据
-      pendingContents.value = pendingContents.value.filter(
-        item => !contentIds.includes(item.contentId)
-      )
-
-      // 更新分页信息
-      const removedCount = contentIds.length
-      if (pagination.value.total >= removedCount) {
-        pagination.value.total -= removedCount
-        recalculatePages()
-      }
-    } catch (err) {
-      error.value = `批量${status === 'APPROVED' ? '通过' : '驳回'}操作失败`
-      console.error('Batch Audit Error:', err)
-      throw err
-    }
-  }
-
-  // 时间格式化
+  // 时间格式化（保持不变）
   const formatDateTime = (isoString: string) => {
     try {
       const date = new Date(isoString)
@@ -161,9 +139,8 @@ export const useContentAuditStore = defineStore('contentAudit', () => {
     pagination,
     loading,
     error,
-    formatDateTime,  // 确保导出
+    formatDateTime,
     fetchPendingContents,
-    auditContent,
-    batchAudit
+    auditContent
   }
 })

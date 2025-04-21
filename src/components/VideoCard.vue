@@ -25,7 +25,9 @@ defineProps<{
 
 <style lang="scss" scoped>
 .video-card {
-  background: white;
+  background: hsl(0, 0%, 100%);
+  border: 1px solid hsl(0, 0%, 90%); // 新增边框
+  box-sizing: border-box;         // 确保边框不增加元素尺寸
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
@@ -33,6 +35,7 @@ defineProps<{
 
   &:hover {
     transform: translateY(-3px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); // 可选添加悬停阴影增强效果
   }
 
   .cover {

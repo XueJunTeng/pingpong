@@ -30,12 +30,6 @@
           clearable
           @change="handleSearch"
         />
-        <el-button type="primary" @click="openCreateDialog">
-          新建用户
-        </el-button>
-        <el-button type="success" @click="handleExport">
-          导出数据
-        </el-button>
       </div>
     </div>
 
@@ -48,7 +42,7 @@
     >
       <el-table-column type="selection" width="55" />
       <el-table-column prop="username" label="用户名" width="180" />
-      <el-table-column prop="email" label="邮箱" width="220" />
+      <el-table-column prop="email" label="邮箱" width="300" />
       <el-table-column prop="role" label="角色" width="800">
   <template #default="{ row }">
     <div class="role-container">
@@ -71,25 +65,13 @@
     </div>
   </template>
 </el-table-column>
-      <el-table-column prop="status" label="状态" width="100">
+      <el-table-column prop="status" label="状态" width="200">
         <template #default="{ row }">
           <el-switch
             :model-value="row.status"
             active-value="active"
             inactive-value="disabled"
             @change="(val: UserStatus) => updateUserStatus(row.userId, val)"          />
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="200">
-        <template #default="{ row }">
-          <el-button size="small" @click="editUser(row.userId)">编辑</el-button>
-          <el-button
-            size="small"
-            type="danger"
-            @click="deleteUser(row.userId)"
-          >
-            删除
-          </el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -220,20 +202,6 @@ const updateUserStatus = async (userId: number, status: UserStatus) => {
   }
 }
 
-// 删除用户
-const deleteUser = async (userId: number) => {
-  try {
-    await userStore.batchOperation({
-      operation: 'delete',
-      userIds: [userId]
-    })
-    // 重新加载数据保持分页正确
-    userStore.fetchUsers(getQueryParams())
-  } catch (error) {
-    console.error('删除失败:', error)
-  }
-}
-
 // 批量选择处理
 const selectedUsers = ref<number[]>([])
   const handleSelectionChange = (selection: UserProfile[]) => {
@@ -242,21 +210,9 @@ const selectedUsers = ref<number[]>([])
 
 
 
-// 导出处理
-const handleExport = () => {
-  userStore.exportUsers(getQueryParams())
-}
 
-// 编辑用户
-const editUser = (userId: number) => {
-  console.log('编辑用户:', userId)
-  // TODO: 打开编辑弹窗
-}
 
-// 新建用户
-const openCreateDialog = () => {
-  // TODO: 打开新建弹窗
-}
+
 
 
 </script>

@@ -49,23 +49,27 @@
             </div>
           </div>
           <div class="action-buttons">
-            <button
-              class="bilibili-btn like-btn"
-              :class="{ 'active': videoStore.currentVideo.isLiked }"
-              @click="handleLike"
-            >
-              <i class="fas fa-thumbs-up"></i>
-              {{ videoStore.currentVideo.likes || '点赞' }}
-            </button>
-            <button
-              class="bilibili-btn favorite-btn"
-              :class="{ 'active': videoStore.currentVideo.isFavorited }"
-              @click="handleFavorite"
-            >
-              <i class="fas fa-bookmark"></i>
-              {{ videoStore.currentVideo.favorites || '收藏' }}
-            </button>
-          </div>
+                  <button
+                    class="bilibili-btn like-btn"
+                    :class="{ 'active': videoStore.currentVideo.isLiked }"
+                    @click="handleLike"
+                  >
+                    <div class="btn-icon">👍</div>
+                    <div class="btn-text">
+                      {{ videoStore.currentVideo.likes || '点赞' }}
+                    </div>
+                  </button>
+                  <button
+                    class="bilibili-btn favorite-btn"
+                    :class="{ 'active': videoStore.currentVideo.isFavorited }"
+                    @click="handleFavorite"
+                  >
+                    <div class="btn-icon">⭐</div>
+                    <div class="btn-text">
+                      {{ videoStore.currentVideo.favorites || '收藏' }}
+                    </div>
+                  </button>
+                </div>
         </div>
 
         <!-- 文章内容 -->

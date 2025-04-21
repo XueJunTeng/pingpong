@@ -32,14 +32,12 @@ export type ContentStatus =
 export type ContentType =
   | 'VIDEO'     // 视频
   | 'ARTICLE'   // 文章
-  | 'POST'      // 帖子
-  | 'COMMENT'   // 评论
 
 
  //内容标签类型
 export interface ContentTag {
   tagId: number
-  name: string
+  tagName: string
   weight?: number  // 用于推荐算法的权重值
 }
 

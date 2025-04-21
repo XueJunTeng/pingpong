@@ -1,6 +1,43 @@
-<!-- src/views/admin/ContentManagement.vue -->
 <template>
   <div class="management-container">
+    <!-- 搜索栏 -->
+    <div class="search-bar">
+      <el-form :inline="true" @submit.prevent="handleSearch">
+        <el-form-item label="关键词">
+          <el-input
+            v-model="searchParams.keyword"
+            placeholder="请输入标题/作者"
+            clearable
+            @clear="handleSearch"
+            @keyup.enter="handleSearch"
+          />
+        </el-form-item>
+        <el-form-item label="内容类型">
+          <el-select
+            v-model="searchParams.contentType"
+            placeholder="全部类型"
+            clearable
+          >
+            <el-option
+              v-for="type in contentTypes"
+              :key="type.value"
+              :label="type.label"
+              :value="type.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button
+            type="primary"
+            @click="handleSearch"
+            :loading="auditStore.loading"
+          >
+            搜索
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </div>
+
     <h2>内容审核</h2>
 
     <!-- 加载状态 -->
@@ -28,45 +65,52 @@
           empty-text="暂无待审内容"
           :header-cell-style="{ background: '#f5f7fa' }"
         >
-        <el-table-column prop="title" label="标题" min-width="240">
-          <template #default="{ row }">
-            <div class="title-cell">
-              {{ row.title }}
-            </div>
-          </template>
-        </el-table-column>
-<!-- 封面列 -->
-  <el-table-column label="内容" min-width="140" align="center">
-    <template #default="{ row }">
-      <div v-if="row.type === 'VIDEO'" class="video-cover-container">
-        <el-image
-          :src="row.coverImageUrl || '/default-cover.jpg'"
-          fit="cover"
-          class="cover-image"
-          :preview-src-list="row.type === 'VIDEO' ? [row.coverImageUrl] : []"
-        >
-          <template #error>
-            <div class="image-error">
-              <el-icon><Picture /></el-icon>
-            </div>
-          </template>
+          <el-table-column prop="title" label="标题" min-width="240">
+            <template #default="{ row }">
+              <div class="title-cell">
+                {{ row.title }}
+              </div>
+            </template>
+          </el-table-column>
 
-          <template #placeholder>
-            <div class="image-loading">
-              <el-icon class="is-loading"><Loading /></el-icon>
-            </div>
-          </template>
-        </el-image>
+          <!-- 封面列 -->
+          <el-table-column label="浏览" min-width="140" align="center">
+            <template #default="{ row }">
+              <div
+                :class="['cover-container', { 'video-cover-container': row.type === 'VIDEO' }]"
+                @click="row.type === 'VIDEO' && handlePlayVideo(row)"
+              >
+                <el-image
+                  :src="row.coverImageUrl || '/default-cover.jpg'"
+                  fit="cover"
+                  class="cover-image"
+                  :preview-src-list="row.type === 'VIDEO' ? [row.coverImageUrl] : []"
+                >
+                  <template #error>
+                    <div class="image-error">
+                      <el-icon><Picture /></el-icon>
+                    </div>
+                  </template>
 
-        <div class="play-overlay" @click.stop="handlePlayVideo(row)">
-          <el-icon :size="32"><VideoPlay /></el-icon>
-        </div>
-      </div>
+                  <template #placeholder>
+                    <div class="image-loading">
+                      <el-icon class="is-loading"><Loading /></el-icon>
+                    </div>
+                  </template>
+                </el-image>
 
-      <span v-else class="no-cover-text">N/A</span>
-    </template>
-  </el-table-column>
-        <el-table-column label="类型" min-width="120" align="center">
+                <!-- 视频播放按钮 -->
+                <div
+                  v-if="row.type === 'VIDEO'"
+                  class="play-overlay"
+                >
+                  <el-icon :size="32"><VideoPlay /></el-icon>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="类型" min-width="120" align="center">
             <template #default="{ row }">
               <el-tag
                 :type="getTypeTag(row.type)"
@@ -94,10 +138,10 @@
           </el-table-column>
 
           <el-table-column
-              label="操作"
-              width="220"
-              align="center"
-              fixed="right"
+            label="操作"
+            width="220"
+            align="center"
+            fixed="right"
           >
             <template #default="{ row }">
               <el-button
@@ -137,7 +181,8 @@
         />
       </template>
     </el-skeleton>
-    <!-- 视频弹窗应放在最外层 -->
+
+    <!-- 视频弹窗 -->
     <el-dialog
       v-model="showVideoDialog"
       title="视频预览"
@@ -156,21 +201,120 @@
         您的浏览器不支持视频播放
       </video>
     </el-dialog>
+
+    <!-- 驳回原因弹窗 -->
+    <el-dialog
+      v-model="rejectDialogVisible"
+      title="请选择驳回原因"
+      width="500px"
+      @closed="handleRejectDialogClose"
+    >
+      <el-form :model="rejectReason" :rules="rejectRules" ref="rejectForm">
+        <el-form-item label="驳回原因" prop="selectedReason">
+          <el-select
+            v-model="rejectReason.selectedReason"
+            placeholder="请选择驳回原因"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="reason in rejectReasons"
+              :key="reason.value"
+              :label="reason.label"
+              :value="reason.value"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item
+          v-if="rejectReason.selectedReason === 'other'"
+          label="具体原因"
+          prop="customReason"
+        >
+          <el-input
+            v-model="rejectReason.customReason"
+            type="textarea"
+            placeholder="请输入具体驳回原因"
+            :rows="3"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="rejectDialogVisible = false">取消</el-button>
+        <el-button type="warning" @click="handleRejectConfirm">确认驳回</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 详情弹窗 -->
+    <content-detail-dialog
+      v-model="detailVisible"
+      :content="selectedContent"
+      :loading="detailLoading"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { useContentAuditStore } from '@/stores/contentAuditStore'
 import { ElMessage } from 'element-plus'
-import type { ContentItem } from '@/types/content'  // 添加类型导入
+import type { ContentItem } from '@/types/content'
 import { VideoPlay, Picture, Loading } from '@element-plus/icons-vue'
+import type { Rule } from 'async-validator'
+import { reactive } from 'vue'
+import { watchDebounced } from '@vueuse/core'
+import { useContentAuditStore } from '@/stores/contentAuditStore'
+import ContentDetailDialog from '@/components/ContentDetailDialog.vue'
 
+interface SearchParams {
+  keyword: string
+  contentType: string
+}
 
+// 搜索参数
+const searchParams = reactive<SearchParams>({
+  keyword: '',
+  contentType: ''
+})
+
+// 内容类型选项
+const contentTypes = [
+  { value: 'VIDEO', label: '视频' },
+  { value: 'ARTICLE', label: '文章' },
+]
+
+// 搜索处理
+watchDebounced(
+  () => ({ ...searchParams }),
+  () => {
+    if (searchParams.keyword.length >= 2 || searchParams.keyword === '') {
+      handleSearch()
+    }
+  },
+  { debounce: 500, deep: true }
+)
+
+const handleSearch = () => {
+  auditStore.fetchPendingContents({
+    page: 1,
+    keyword: searchParams.keyword,
+    contentType: searchParams.contentType
+  })
+}
+
+// 审核相关
 const auditStore = useContentAuditStore()
 const processingId = ref<number | null>(null)
 
-// 处理后的内容数据
+// 分页处理
+const handlePageChange = (newPage: number) => {
+  auditStore.fetchPendingContents({
+    page: newPage,
+    keyword: searchParams.keyword,
+    contentType: searchParams.contentType
+  })
+}
+
+// 内容处理
 const processedContents = computed(() =>
   auditStore.pendingContents.map(item => ({
     ...item,
@@ -178,12 +322,12 @@ const processedContents = computed(() =>
   }))
 )
 
-// 初始化加载数据
+// 初始化加载
 onMounted(() => {
   auditStore.fetchPendingContents()
 })
 
-// 类型标签样式
+// 类型显示
 const getTypeTag = (type: string) => {
   return {
     VIDEO: 'danger',
@@ -193,7 +337,6 @@ const getTypeTag = (type: string) => {
   }[type] || ''
 }
 
-// 类型显示文本
 const getTypeLabel = (type: string) => {
   return {
     VIDEO: '视频',
@@ -203,15 +346,14 @@ const getTypeLabel = (type: string) => {
   }[type] || '未知类型'
 }
 
-// 视频播放状态
+// 视频播放相关
 const showVideoDialog = ref(false)
 const currentVideoUrl = ref('')
-const videoPlayer = ref<HTMLVideoElement>() // 添加视频元素引用
-  const handlePlayVideo = (row: ContentItem) => {
-  console.log('播放事件触发，当前路由:', window.location.href)
-  if (row.type !== 'VIDEO') return
+const videoPlayer = ref<HTMLVideoElement>()
 
-  handleVideoClose() // 先停止之前的播放
+const handlePlayVideo = (row: ContentItem) => {
+  if (row.type !== 'VIDEO') return
+  handleVideoClose()
 
   if (!row.filePath) {
     ElMessage.error('视频路径未配置')
@@ -223,7 +365,6 @@ const videoPlayer = ref<HTMLVideoElement>() // 添加视频元素引用
 }
 
 const handleVideoOpen = () => {
-  // 这里可以放置视频打开后的处理逻辑，比如自动播放
   nextTick(() => {
     if (videoPlayer.value) {
       videoPlayer.value.play().catch(err => {
@@ -232,20 +373,17 @@ const handleVideoOpen = () => {
     }
   })
 }
+
 const handleVideoClose = () => {
   if (videoPlayer.value) {
-    try {
-      videoPlayer.value.pause()
-      videoPlayer.value.currentTime = 0
-      videoPlayer.value.removeAttribute('src') // 清除视频源
-      videoPlayer.value.load()
-    } catch (err) {
-      console.error('停止播放失败:', err)
-    }
+    videoPlayer.value.pause()
+    videoPlayer.value.currentTime = 0
+    videoPlayer.value.removeAttribute('src')
+    videoPlayer.value.load()
   }
   currentVideoUrl.value = ''
 }
-// 新增调试方法
+
 const handleVideoLoaded = (e: Event) => {
   const video = e.target as HTMLVideoElement
   console.log('视频元数据加载成功', {
@@ -256,11 +394,6 @@ const handleVideoLoaded = (e: Event) => {
 
 const handleVideoError = (e: Event) => {
   const video = e.target as HTMLVideoElement
-  console.error('视频加载错误', {
-    error: video.error,
-    networkState: video.networkState,
-    readyState: video.readyState
-  })
   ElMessage.error('视频加载失败，错误代码: ' + video.error?.code)
 }
 
@@ -269,12 +402,7 @@ const formatTime = (isoString: string) => {
   return auditStore.formatDateTime(isoString)
 }
 
-// 分页变化处理
-const handlePageChange = (newPage: number) => {
-  auditStore.fetchPendingContents(newPage)
-}
-
-// 修改后的处理方法
+// 审核操作
 const handleApprove = async (contentId: number) => {
   try {
     processingId.value = contentId
@@ -287,27 +415,101 @@ const handleApprove = async (contentId: number) => {
   }
 }
 
-const handleReject = async (contentId: number) => {
+// 驳回相关
+const rejectDialogVisible = ref(false)
+const currentRejectId = ref<number | null>(null)
+const rejectForm = ref()
+const rejectReasons = ref([
+  { value: '1', label: '内容违规' },
+  { value: '2', label: '内容与标题不符' },
+  { value: '3', label: '内容与标签不符' },
+  { value: '4', label: '包含敏感信息' },
+  { value: 'other', label: '其他原因' }
+])
+
+const rejectReason = reactive({
+  selectedReason: '',
+  customReason: ''
+})
+
+const rejectRules = {
+  selectedReason: [
+    { required: true, message: '请选择驳回原因', trigger: 'change' }
+  ],
+  customReason: [
+    {
+      validator: (
+        rule: Rule,
+        value: string,
+        callback: (error?: string) => void
+      ) => {
+        if (rejectReason.selectedReason === 'other' && !value.trim()) {
+          callback('请输入具体驳回原因')
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
+}
+
+const handleReject = (contentId: number) => {
+  currentRejectId.value = contentId
+  rejectDialogVisible.value = true
+}
+
+const handleRejectConfirm = async () => {
   try {
-    processingId.value = contentId
-    await auditStore.auditContent(contentId, 'REJECTED', '请补充驳回原因')
+    await rejectForm.value.validate()
+
+    if (currentRejectId.value === null) return
+
+    const reason = rejectReason.selectedReason === 'other'
+      ? rejectReason.customReason
+      : rejectReasons.value.find(r => r.value === rejectReason.selectedReason)?.label
+
+    if (!reason) {
+      ElMessage.error('请填写有效驳回原因')
+      return
+    }
+
+    processingId.value = currentRejectId.value
+    await auditStore.auditContent(currentRejectId.value, 'REJECTED', reason)
     ElMessage.warning('内容已驳回')
-  } catch {
-    ElMessage.error('操作失败，请重试')
+    rejectDialogVisible.value = false
+  } catch (err) {
+    console.error('驳回操作失败:', err)
   } finally {
     processingId.value = null
   }
 }
 
-// 查看详情
-const viewDetail = (content: ContentItem) => {
-  console.log('查看详情:', content.contentId, content.title)
-  // 实际跳转逻辑
+const handleRejectDialogClose = () => {
+  rejectForm.value?.resetFields()
+  currentRejectId.value = null
+}
+
+// 详情相关
+const detailVisible = ref(false)
+const selectedContent = ref<ContentItem>({} as ContentItem)
+const detailLoading = ref(false)
+
+const viewDetail = async (content: ContentItem) => {
+  try {
+    detailLoading.value = true
+    selectedContent.value = content
+    detailVisible.value = true
+  } catch (error) {
+    ElMessage.error('获取详情失败')
+    console.error('详情加载错误:', error)
+  } finally {
+    detailLoading.value = false
+  }
 }
 </script>
 
 <style scoped>
-/* 表格容器优化 */
 .management-container {
   padding: 24px;
   background: #fff;
@@ -315,18 +517,40 @@ const viewDetail = (content: ContentItem) => {
   box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
 }
 
-/* 表头优化 */
+.search-bar {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+
+  :deep(.el-form-item) {
+    margin-bottom: 0;
+    margin-right: 24px;
+  }
+
+  :deep(.el-select) {
+    width: 240px;
+  }
+
+  .el-input {
+    width: 240px;
+  }
+}
+
+/* 表格样式 */
 :deep(.el-table__header) th {
   font-weight: 600;
   color: #303133;
 }
 
-/* 单元格内容优化 */
 .title-cell {
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  line-height: 1.5;
 }
 
 .author-name {
@@ -339,7 +563,6 @@ const viewDetail = (content: ContentItem) => {
   font-size: 0.9em;
 }
 
-/* 分页位置优化 */
 .pagination {
   margin-top: 24px;
   display: flex;
@@ -350,17 +573,16 @@ const viewDetail = (content: ContentItem) => {
   box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);
 }
 
-/* 操作按钮间距优化 */
-.el-button + .el-button {
-  margin-left: 8px;
-}
-/* 视频封面容器 */
-.video-cover-container {
+/* 封面样式 */
+.cover-container {
   position: relative;
-  cursor: pointer;
   border-radius: 4px;
   overflow: hidden;
   transition: transform 0.3s ease;
+}
+
+.video-cover-container {
+  cursor: pointer;
 
   &:hover {
     transform: scale(1.03);
@@ -370,27 +592,15 @@ const viewDetail = (content: ContentItem) => {
       background: rgba(0, 0, 0, 0.5);
     }
   }
-  &::after {
-    display: none !important; /* 临时禁用遮罩层 */
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1;
-  }
 }
 
 .cover-image {
   width: 160px;
-  height: 90px; /* 16:9比例 */
+  height: 90px;
   background: #f0f2f5;
 }
 
 .play-overlay {
-  pointer-events: auto !important;
-  z-index: 1000 !important;
   position: absolute;
   top: 0;
   left: 0;
@@ -402,13 +612,12 @@ const viewDetail = (content: ContentItem) => {
   opacity: 0.8;
   transition: all 0.3s ease;
   color: #fff;
-  z-index: 2; /* 确保按钮在最上层 */
-  pointer-events: none; /* 穿透点击事件 */
+  background: rgba(0, 0, 0, 0.3);
 }
 
-
 .image-error, .image-loading {
-  @extend .cover-image;
+  width: 160px;
+  height: 90px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -420,15 +629,15 @@ const viewDetail = (content: ContentItem) => {
   }
 }
 
-.no-cover-text {
-  color: #909399;
-  font-size: 0.9em;
-}
-
 .video-player {
   width: 100%;
   max-height: 70vh;
   border-radius: 8px;
   background: #000;
+}
+
+/* 操作按钮间距 */
+.el-button + .el-button {
+  margin-left: 8px;
 }
 </style>

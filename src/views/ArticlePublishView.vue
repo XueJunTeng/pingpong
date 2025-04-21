@@ -88,13 +88,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useUploadStore } from '@/stores/upload'
 import TagSelector from '@/components/TagSelector.vue'
 import FileUploader from '@/components/FileUploader.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import type { ContentUploadForm } from '@/types/content'
+import { useNavStore } from '@/stores/TagStore'
+const navStore = useNavStore()
 const uploadStore = useUploadStore()
+onMounted(() => {
+  navStore.fetchTags()
+})
 // 表单数据
 const form = ref<ContentUploadForm>({
   title: '',

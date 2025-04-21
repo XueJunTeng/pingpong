@@ -34,27 +34,32 @@ export const useUserStore = defineStore('user', () => {
   const error = ref<string | null>(null)
 
   // 核心 API 方法
-  const fetchUsers = async (params: UserQueryParams) => {
-   try {
+const fetchUsers = async (params: UserQueryParams) => {
+  try {
     loading.value = true;
-    const response = await api.get('api/admin/users', { params });
+    const response = await api.get('api/admin/users', {
+      params: {
+        page: params.page,
+        size: params.pageSize,
+        search: params.search
+      }
+    });
 
-    // 直接访问响应数据（根据你提供的JSON结构）
-    userList.value = response.data.data || [];  // 用户数组
+    // 关键修改：使用请求参数中的 pageSize 而非响应数据
     currentPagination.value = {
-      page: response.data.currentPage,    // 当前页码
-      pageSize: response.data.pageSize,   // 每页数量
-      total: response.data.total          // 总记录数
+      page: response.data.currentPage,
+      pageSize: response.data.pageSize,  // 使用前端传入的参数
+      total: response.data.total
     };
 
-    // 调试日志
-    } catch (err) {
-      error.value = '获取用户数据失败'
-      console.error(err)
-    } finally {
-      loading.value = false
-    }
+    userList.value = response.data.data || [];
+  } catch (err) {
+    error.value = '获取用户数据失败';
+    console.error(err);
+  } finally {
+    loading.value = false;
   }
+}
 
   // 更新用户状态
   const updateUserStatus = async (userId: number, status: UserStatus) => {
