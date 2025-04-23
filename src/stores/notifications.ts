@@ -2,45 +2,78 @@ import request from '@/api/request'
 import { defineStore } from 'pinia'
 import axios from 'axios'
 
+interface UnreadCounts {
+  replyComment: number
+  like: number
+}
+
 export const useNotificationsStore = defineStore('notifications', {
   state: () => ({
-    unreadTotal: 0
+    // 拆分未读数为独立字段
+    counts: {
+      replyComment: 0,
+      like: 0
+    } as UnreadCounts
   }),
 
+  getters: {
+    // 可选：计算总未读数
+    totalUnread(): number {
+      return this.counts.replyComment + this.counts.like
+    }
+  },
+
   actions: {
-    async fetchUnreadCount() {
+    async fetchUnreadCounts() {
       try {
         const response = await request.get<{
           code: number
-          data: { count: number }
-        }>('/api/notifications/unread-count')
+          data: UnreadCounts
+        }>('/api/notifications/unread-counts')
 
         // 严格校验响应格式
         if (
           response.status !== 200 ||
-          typeof response.data.data?.count !== 'number'
+          typeof response.data.data?.replyComment !== 'number' ||
+          typeof response.data.data?.like !== 'number'
         ) {
-          throw new Error(`无效响应: ${JSON.stringify(response.data)}`)
+          throw new Error(`无效响应格式: ${JSON.stringify(response.data)}`)
         }
 
-        this.unreadTotal = response.data.data.count
-        console.log('成功更新未读数:', this.unreadTotal)
+        this.updateCounts(response.data.data)
+        console.log('未读数更新成功:', this.counts)
 
       } catch (error) {
-        console.error('获取未读数失败:', error)
-        if (axios.isAxiosError(error)) {
-          console.error('错误响应:', {
-            status: error.response?.status,
-            data: error.response?.data
-          })
-        }
-        // 保留历史值防止UI闪烁
-        return this.unreadTotal
+        this.handleError(error)
+        // 返回当前状态以便恢复
+        return this.counts
       }
     },
 
-    setUnreadTotal(count: number) {
-      this.unreadTotal = Math.max(0, count)
+    // 更新计数方法
+    updateCounts(newCounts: Partial<UnreadCounts>) {
+      this.counts = {
+        replyComment: Math.max(0, newCounts.replyComment ?? this.counts.replyComment),
+        like: Math.max(0, newCounts.like ?? this.counts.like)
+      }
+    },
+
+    // 错误处理统一封装
+     handleError(error: unknown) {
+      console.error('未读数操作失败:', error)
+      if (axios.isAxiosError(error)) {
+        console.error('请求详情:', {
+          url: error.config?.url,
+          method: error.config?.method,
+          status: error.response?.status,
+          data: error.response?.data
+        })
+      }
+    },
+
+    // 重置状态（可选）
+    reset() {
+      this.counts = { replyComment: 0, like: 0 }
     }
   }
 })

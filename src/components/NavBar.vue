@@ -27,8 +27,8 @@
       <router-link to="/notifications" class="menu-item">
         <span class="icon">🔔</span>
         <span class="text">消息</span>
-        <span v-if="unreadTotal > 0" class="notification-badge">
-          {{ unreadTotal > 99 ? '99+' : unreadTotal }}
+        <span v-if="totalUnread > 0" class="notification-badge">
+          {{ totalUnread > 99 ? '99+' : totalUnread }}
         </span>
       </router-link>
       <router-link to="/Article" class="menu-item">
@@ -51,7 +51,7 @@ import { useRouter } from 'vue-router'
 import { onMounted, ref } from 'vue'
 import { useNotificationsStore } from '@/stores/notifications'
 const notificationsStore = useNotificationsStore()
-const { unreadTotal } = storeToRefs(notificationsStore)
+const { totalUnread } = storeToRefs(notificationsStore)
 
 
 const authStore = useAuthStore()
@@ -78,8 +78,10 @@ const handleSearch = () => {
 }
 
 onMounted(async () => {
-    await notificationsStore.fetchUnreadCount()
-    console.log('未读数:', unreadTotal.value) // 调试输出
+    await notificationsStore.fetchUnreadCounts()
+    console.log('回复未读数:', notificationsStore.counts.replyComment);
+    console.log('点赞未读数:', notificationsStore.counts.like);
+    console.log('总未读数:', notificationsStore.totalUnread);
 })
 </script>
 

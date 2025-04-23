@@ -29,7 +29,11 @@ const authStore = useAuthStore()
 const logout = () => {
   authStore.userlogout()
   // 跳转到登录页
-  router.replace({ name: 'Login' })
+  // 跳转时携带当前路径参数
+  router.replace({
+  name: 'Login',
+  query: { redirect: '/admin' }  // 新增此行
+  })
   // 显示成功提示
   ElMessage.success({
   message: '已安全退出系统',

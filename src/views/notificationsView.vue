@@ -1,4 +1,5 @@
 <template>
+  <!-- 模板部分保持不变，与原始代码相同 -->
   <div class="notifications-container">
     <!-- 左侧导航 -->
     <div class="nav-sidebar">
@@ -13,13 +14,17 @@
         <el-menu-item index="REPLY_AND_COMMENT">
           <el-icon><ChatDotRound /></el-icon>
           <span>回复我的</span>
-          <span v-if="counts.replyComment > 0" class="unread-count">{{ counts.replyComment }}</span>
+          <span v-if="counts.replyComment > 0" class="unread-count">
+            {{ counts.replyComment }}
+          </span>
         </el-menu-item>
 
         <el-menu-item index="LIKE">
           <el-icon><Goods /></el-icon>
           <span>收到的赞</span>
-          <span v-if="counts.like > 0" class="unread-count">{{ counts.like }}</span>
+          <span v-if="counts.like > 0" class="unread-count">
+            {{ counts.like }}
+          </span>
         </el-menu-item>
       </el-menu>
     </div>
@@ -33,19 +38,21 @@
             :key="item.notificationId"
             class="notification-item"
             :class="{ unread: !item.isRead }"
+            @click="markAsRead(item)"
           >
-            <!-- 头像区域 -->
             <div class="avatar-wrapper">
               <el-avatar
-                :src="item.senderAvatarUrl"
+                :src="item.senderAvatarUrl || '/default-avatar.png'"
                 :size="40"
               />
               <div class="notification-icon">
-                <component :is="typeIcons[item.type]" />
+                <component
+                  :is="typeIcons[item.type]"
+                  v-if="typeIcons[item.type]"
+                />
               </div>
             </div>
 
-            <!-- 内容区域 -->
             <div class="content-wrapper">
               <div class="content-header">
                 <span class="username">{{ item.senderUsername }}</span>
@@ -56,7 +63,7 @@
                   :type="item.type === 'COMMENT' ? 'primary' : 'success'"
                   class="type-tag"
                 >
-                  {{ item.type === 'COMMENT' ? '评论' : '回复' }}
+                  {{ itemTypeMap[item.type as keyof ItemTypeMap] || '消息' }}
                 </el-tag>
               </div>
               <div class="content-body">
@@ -70,7 +77,7 @@
                   v-if="item.contentTitle"
                   type="info"
                   class="content-link"
-                  @click="navigateToContent(item)"
+                  @click.stop="navigateToContent(item)"
                 >
                   查看内容：{{ item.contentTitle }}
                 </el-link>
@@ -79,7 +86,6 @@
           </div>
         </template>
 
-        <!-- 空状态 -->
         <el-empty v-else description="暂时没有新通知哦~" class="text-only-empty">
           <template #image>
             <div class="text-empty-wrapper">
@@ -90,11 +96,11 @@
         </el-empty>
       </div>
 
-      <!-- 分页 -->
-      <div class="pagination-wrapper" v-if="total > 0">
+      <div class="pagination-wrapper" v-if="total > pageSize">
         <el-pagination
           v-model:current-page="currentPage"
           :page-size="pageSize"
+          :pager-count="5"
           layout="prev, pager, next"
           :total="total"
           @current-change="handlePageChange"
@@ -105,13 +111,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChatDotRound, Goods } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
+import type { Component } from 'vue'
 import request from '@/api/request'
+// 新增导入
 import { useNotificationsStore } from '@/stores/notifications'
+// 在 setup 部分初始化 store
+const notificationsStore = useNotificationsStore()
 interface Notification {
   notificationId: number
   senderId: number
@@ -126,171 +136,233 @@ interface Notification {
   senderUsername: string
   contentTitle: string
   commentContent: string | null
-  total: number
   contentType: string
 }
 
-// 路由处理
+interface UnreadCountsResponse {
+  replyComment?: number
+  reply_comment?: number
+  like?: number
+  like_count?: number
+}
+
+interface ItemTypeMap {
+  COMMENT: string
+  REPLY: string
+}
+
 const route = useRoute()
 const router = useRouter()
 
+// 会话期未读ID集合
+const sessionUnreadIds = ref<Set<number>>(new Set())
+const isMounted = ref(false)
+let abortController: AbortController | null = null
+
 // 响应式数据
-const activeTab = ref<string>((route.query.type as string) || 'REPLY_AND_COMMENT')
+const activeTab = ref('REPLY_AND_COMMENT')
 const loading = ref(false)
-const allNotifications = ref<Notification[]>([])
 const filteredNotifications = ref<Notification[]>([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
 
-// 类型图标映射
-const typeIcons = {
+// 类型映射
+const typeIcons: Record<string, Component> = {
   LIKE: Goods,
   REPLY: ChatDotRound,
   COMMENT: ChatDotRound
 }
 
-// 未读数
+const itemTypeMap: ItemTypeMap = {
+  COMMENT: '评论',
+  REPLY: '回复'
+}
+
+// 初始化计数数据
 const counts = ref({
   replyComment: 0,
   like: 0
 })
 
-// 生命周期
-onMounted(() => {
-  loadNotifications()
-})
+const loadData = async () => {
+  if (!isMounted.value) return
 
-// 监听路由变化
-watch(() => route.query.type, (newType) => {
-  if (newType) {
-    activeTab.value = newType.toString()
-    filterNotifications()
+  try {
+    loading.value = true
+    abortController?.abort()
+    abortController = new AbortController()
+
+    const [notificationsRes, countsRes] = await Promise.all([
+      request.get<{
+        list: Notification[]
+        total: number
+      }>('/api/notifications', {
+        params: {
+          page: currentPage.value,
+          pageSize: pageSize.value,
+          types: getNotificationTypes().join(',')
+        },
+        signal: abortController.signal
+      }),
+      request.get('/api/notifications/unread-counts', {
+        signal: abortController.signal
+      })
+    ])
+
+    if (!isMounted.value) return
+
+    // 初始化会话期未读ID
+    const initialUnreadIds = notificationsRes.data.list
+      .filter(item => !item.isRead)
+      .map(item => item.notificationId)
+
+    sessionUnreadIds.value = new Set(initialUnreadIds)
+
+    // 更新通知列表（保持原始未读状态）
+    filteredNotifications.value = notificationsRes.data.list.map(item => ({
+      ...item,
+      isRead: item.isRead, // 保持服务器返回的状态
+      senderAvatarUrl: item.senderAvatarUrl || '/default-avatar.png',
+      commentContent: item.commentContent || null
+    }))
+
+    total.value = notificationsRes.data.total
+
+    // 替换原有的 counts.value 赋值代码
+    const newCounts = {
+      replyComment: Number(countsRes.data.data.replyComment ?? 0),
+      like: Number(countsRes.data.data.like ?? 0)
+    }
+    counts.value = newCounts
+    notificationsStore.updateCounts(newCounts) // 同步到 store
+
+
+  } catch (error: unknown) {
+    handleError(error)
+  } finally {
+    if (isMounted.value) loading.value = false
   }
-})
-
-// 方法
-const handleTabChange = (tab: string) => {
-  activeTab.value = tab
-  currentPage.value = 1
-  filterNotifications()
 }
 
-const formatTime = (time: string) => {
-  return dayjs(time).format('MM-DD HH:mm')
+const handleError = (error: unknown) => {
+  if (error instanceof Error && error.name === 'AbortError') return
+  console.error('请求错误:', error)
+  ElMessage.error(error instanceof Error ? error.message : '请求失败，请稍后重试')
 }
+
+const getNotificationTypes = (): string[] => {
+  return activeTab.value === 'REPLY_AND_COMMENT'
+    ? ['COMMENT', 'REPLY']
+    : ['LIKE']
+}
+
+const formatTime = (time: string) => dayjs(time).format('MM-DD HH:mm')
 
 const navigateToContent = (item: Notification) => {
   if (!item.contentId || !item.contentType) {
-    console.warn('缺少必要的内容参数', item)
     return ElMessage.warning('内容参数不完整')
   }
 
-  const CONTENT_TYPE_ROUTES = {
+  const routeMap: Record<string, string> = {
     article: 'ArticleDetail',
     video: 'VideoDetail',
-  } as const
-
-  const routeName = CONTENT_TYPE_ROUTES[item.contentType.toLowerCase() as keyof typeof CONTENT_TYPE_ROUTES]
-
-  if (!routeName) {
-    console.error('未知的内容类型:', item.contentType)
-    return ElMessage.error('暂不支持该内容类型')
+    post: 'PostDetail'
   }
+
+  const routeName = routeMap[item.contentType.toLowerCase()]
+  if (!routeName) return ElMessage.error('未知内容类型')
 
   router.push({
     name: routeName,
-    params: {
-      contentId: item.contentId
-    }
+    params: { contentId: item.contentId },
+    query: { from: 'notification' }
   })
 }
-// 新增批量标记方法
-const markBatchAsRead = async (ids: number[]) => {
-  if (ids.length === 0) return
 
-  try {
-    // 调用批量标记API
-    await request.post('/api/notifications/batch-read', { ids })
+const handleTabChange = (tab: string) => {
+  if (tab === activeTab.value) return
 
-    // 更新本地未读数
-    const currentUnread = notificationsStore.unreadTotal - ids.length
-    notificationsStore.setUnreadTotal(Math.max(currentUnread, 0))
+  activeTab.value = tab
+  currentPage.value = 1
+  router.replace({
+    query: { ...route.query, type: tab }
+  }).catch(() => {})
+  loadData()
+}
 
-  } catch (error) {
-    console.error('批量标记已读失败:', error)
-    ElMessage.error('标记已读失败')
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  loadData()
+}
+
+const markAsRead = (item: Notification) => {
+  if (!item.isRead && sessionUnreadIds.value.has(item.notificationId)) {
+    // 更新本地状态
+    const updatedNotifications = filteredNotifications.value.map(n =>
+      n.notificationId === item.notificationId
+        ? { ...n, isRead: true }
+        : n
+    )
+    filteredNotifications.value = updatedNotifications
+
+    // 从未读集合中移除
+    sessionUnreadIds.value.delete(item.notificationId)
+
   }
 }
 
+// 退出时处理剩余未读消息
+const handleBeforeUnmount = async () => {
+  isMounted.value = false
+  abortController?.abort()
 
-// 修改分页切换处理
-const handlePageChange = async (page: number) => {
-  currentPage.value = page
-  await loadNotifications() // 加载新页时自动标记
+  try {
+    // 提交剩余未读消息
+    if (sessionUnreadIds.value.size > 0) {
+      await request.post('/api/notifications/batch-read', {
+        ids: Array.from(sessionUnreadIds.value)
+      })
+    }
+
+  // 替换原有的 counts.value 更新代码
+  const res = await request.get<UnreadCountsResponse>('/api/notifications/unread-counts')
+  const newCounts = {
+    replyComment: Number(res.data.replyComment ?? 0),
+    like: Number(res.data.like ?? 0)
+  }
+  notificationsStore.updateCounts(newCounts) // 同步到 store
+  } catch (error) {
+    console.error('退出处理失败:', error)
+  }
 }
 
-// 初始化加载
+// 生命周期
 onMounted(() => {
-  loadNotifications()
+  isMounted.value = true
+  const routeType = route.query.type?.toString()
+  activeTab.value = routeType && ['REPLY_AND_COMMENT', 'LIKE'].includes(routeType)
+    ? routeType
+    : 'REPLY_AND_COMMENT'
+  loadData()
 })
 
-// 修改后的加载方法
-const loadNotifications = async () => {
-  try {
-    loading.value = true
-    const response = await request.get<{
-      list: Notification[]
-      total: number
-    }>('/api/notifications', {
-      params: {
-        page: currentPage.value,
-        pageSize: pageSize.value
-      }
-    })
+onUnmounted(handleBeforeUnmount)
 
-    allNotifications.value = response.data.list
-    total.value = response.data.total
-    // 自动标记当前页为已读
-    const currentPageIds = response.data.list.map(n => n.notificationId)
-    await markBatchAsRead(currentPageIds)
-    filterNotifications()
-  } catch (error) {
-    console.error('加载数据时发生错误:', error)
-    ElMessage.error('数据加载失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-
-
-const notificationsStore = useNotificationsStore()
-const filterNotifications = () => {
-  if (!Array.isArray(allNotifications.value)) return
-
-  // 前端过滤逻辑保持不变
-  const filtered = allNotifications.value.filter(item => {
-    if (activeTab.value === 'REPLY_AND_COMMENT') {
-      return item.type === 'REPLY' || item.type === 'COMMENT'
+watch(
+  () => route.query.type,
+  (newType) => {
+    if (newType && newType !== activeTab.value) {
+      activeTab.value = newType.toString()
+      currentPage.value = 1
+      loadData()
     }
-    return item.type === activeTab.value
-  })
-
-  filteredNotifications.value = filtered
-
-  // 更新未读数
-  counts.value.replyComment = allNotifications.value.filter(n =>
-    ['REPLY', 'COMMENT'].includes(n.type) && !n.isRead
-  ).length
-  counts.value.like = allNotifications.value.filter(n =>
-    n.type === 'LIKE' && !n.isRead
-  ).length
-}
+  }
+)
 </script>
 
 <style scoped lang="scss">
-/* 样式部分保持不变 */
+/* 样式部分保持不变，与原始代码相同 */
 .notifications-container {
   display: flex;
   max-width: 1200px;
@@ -364,11 +436,10 @@ const filterNotifications = () => {
         margin-bottom: 12px;
         transition: background .2s;
         cursor: pointer;
+        position: relative;
 
         &.unread {
           background: #f5fbff;
-          position: relative;
-
           &::before {
             content: '';
             position: absolute;

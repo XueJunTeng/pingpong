@@ -73,10 +73,9 @@ const handleLogin = async () => {
     error.value = ''
     await authStore.login(form.value)
 
-    // 动态跳转逻辑
-    const redirectPath = route.query.redirect?.toString()
-    const defaultPath = authStore.isAdmin ? '/admin' : '/'
-    const targetPath = redirectPath || defaultPath
+     // 统一默认跳转首页
+     const redirectPath = route.query.redirect?.toString()
+    const targetPath = redirectPath || '/' // 移除管理员判断
 
     // 添加跳转动画
     document.body.classList.add('page-transition')
