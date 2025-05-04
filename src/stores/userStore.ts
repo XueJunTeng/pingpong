@@ -19,7 +19,7 @@ interface UserQueryParams extends PaginationParams {
 interface BatchOperation {
   operation: 'status' | 'role' | 'delete'
   userIds: number[]
-  value?: string // 用于存储状态或角色值
+  value?: string
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -33,33 +33,94 @@ export const useUserStore = defineStore('user', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  // 核心 API 方法
-const fetchUsers = async (params: UserQueryParams) => {
-  try {
-    loading.value = true;
-    const response = await api.get('api/admin/users', {
-      params: {
-        page: params.page,
-        size: params.pageSize,
-        search: params.search
+  // 获取用户列表
+  const fetchUsers = async (params: UserQueryParams) => {
+    try {
+      loading.value = true
+      const response = await api.get('api/admin/users', {
+        params: {
+          page: params.page,
+          size: params.pageSize,
+          search: params.search,
+          status: params.status,
+          role: params.role
+        }
+      })
+
+      currentPagination.value = {
+        page: response.data.currentPage,
+        pageSize: params.pageSize, // 保持前端分页设置
+        total: response.data.total
       }
-    });
 
-    // 关键修改：使用请求参数中的 pageSize 而非响应数据
-    currentPagination.value = {
-      page: response.data.currentPage,
-      pageSize: response.data.pageSize,  // 使用前端传入的参数
-      total: response.data.total
-    };
-
-    userList.value = response.data.data || [];
-  } catch (err) {
-    error.value = '获取用户数据失败';
-    console.error(err);
-  } finally {
-    loading.value = false;
+      userList.value = (response.data.data || []).map((user: UserProfile) => ({
+        ...user,
+        _originalRole: user.role
+      }))
+    } catch (err) {
+      error.value = '获取用户数据失败'
+      console.error(err)
+    } finally {
+      loading.value = false
+    }
   }
-}
+
+  // 创建用户
+  const createUser = async (userData: {
+    username: string
+    email: string
+    password: string
+    role: UserRole
+  }) => {
+    try {
+      loading.value = true
+      await api.post('api/admin/users', userData)
+
+      // 创建后重新获取第一页数据
+      await fetchUsers({
+        page: 1,
+        pageSize: currentPagination.value.pageSize
+      })
+    } catch (err) {
+      error.value = '创建用户失败'
+      console.error(err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 批量删除用户
+  const deleteUsers = async (userIds: number[]) => {
+    try {
+      loading.value = true;
+      // 修改请求参数结构
+      await api.post('api/admin/users/batch-operations', {
+        userIds,       // 对应Java类的List<Long> userIds
+        operation: 'delete' // 对应operation字段，删除操作固定为'delete'
+        // newRole字段在删除操作中不需要传递
+      });
+
+      // 更新本地数据
+      userList.value = userList.value.filter(u => !userIds.includes(u.userId));
+      currentPagination.value.total -= userIds.length;
+
+      // 处理空页情况
+      if (userList.value.length === 0 && currentPagination.value.page > 1) {
+        currentPagination.value.page--;
+        await fetchUsers({
+          page: currentPagination.value.page,
+          pageSize: currentPagination.value.pageSize
+        });
+      }
+    } catch (err) {
+      error.value = '删除用户失败';
+      console.error(err);
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
 
   // 更新用户状态
   const updateUserStatus = async (userId: number, status: UserStatus) => {
@@ -67,9 +128,10 @@ const fetchUsers = async (params: UserQueryParams) => {
       await api.patch(`api/admin/users/${userId}/status`, null, {
         params: { status }
       })
-      // 更新本地数据
-      const targetUser = userList.value.find(u => u.userId === userId)
-      if (targetUser) targetUser.status = status
+
+      // 更新本地状态
+      const user = userList.value.find(u => u.userId === userId)
+      if (user) user.status = status
     } catch (err) {
       error.value = '状态更新失败'
       console.error(err)
@@ -77,52 +139,38 @@ const fetchUsers = async (params: UserQueryParams) => {
     }
   }
 
-  // 更新用户角色
+  // 更新用户角色（带当前用户校验）
   const updateUserRole = async (userId: number, newRole: UserRole) => {
     try {
-      // 获取当前登录用户ID（根据实际项目情况调整获取方式）
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-
-      // 禁止修改当前用户角色
       if (userId === currentUser.userId) {
-        error.value = '不能修改当前登录用户的角色'
-        throw new Error('Cannot modify current user role')
+        throw new Error('不能修改当前登录用户的角色')
       }
 
-      // 保存原始值用于回滚
-      const targetUser = userList.value.find(u => u.userId === userId)
-      if (!targetUser) {
-        error.value = '用户不存在'
-        throw new Error('User not found')
-      }
-      const originalRole = targetUser.role
-      targetUser._originalRole = originalRole
+      // 保留原始值
+      const user = userList.value.find(u => u.userId === userId)
+      if (!user) throw new Error('用户不存在')
+      const originalRole = user.role
+      user._originalRole = originalRole
 
-      // 发起API请求
+      // API 请求
       await api.patch(`api/admin/users/${userId}/role`, null, {
         params: { role: newRole }
       })
 
-      // 更新成功后清理临时属性
-      targetUser.role = newRole
-      delete targetUser._originalRole
-
+      // 更新成功
+      user.role = newRole
+      delete user._originalRole
     } catch (err) {
-      // 回滚数据
-      const targetUser = userList.value.find(u => u.userId === userId)
-      if (targetUser && targetUser._originalRole) {
-        targetUser.role = targetUser._originalRole
-        delete targetUser._originalRole
+      // 回滚角色
+      const user = userList.value.find(u => u.userId === userId)
+      if (user?._originalRole) {
+        user.role = user._originalRole
+        delete user._originalRole
       }
 
-      // 错误处理
-      if (err instanceof Error) {
-        error.value = err.message === 'Cannot modify current user role'
-          ? '不能修改当前用户角色'
-          : '角色更新失败'
-        console.error(`[角色更新失败] ${err.message}`)
-      }
-
+      error.value = err instanceof Error ? err.message : '角色更新失败'
+      console.error(err)
       throw err
     }
   }
@@ -136,7 +184,7 @@ const fetchUsers = async (params: UserQueryParams) => {
         newValue: payload.value
       })
 
-      // 更新本地状态
+      // 更新本地数据
       switch (payload.operation) {
         case 'status':
           userList.value = userList.value.map(u =>
@@ -166,7 +214,7 @@ const fetchUsers = async (params: UserQueryParams) => {
     }
   }
 
-  // 导出功能
+  // 导出用户
   const exportUsers = async (params: UserQueryParams) => {
     try {
       const response = await api.get<Blob>('api/admin/users/export', {
@@ -177,7 +225,7 @@ const fetchUsers = async (params: UserQueryParams) => {
         }
       })
 
-      // 创建下载链接
+      // 创建下载
       const url = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
       link.href = url
@@ -198,6 +246,8 @@ const fetchUsers = async (params: UserQueryParams) => {
     loading,
     error,
     fetchUsers,
+    createUser,
+    deleteUsers,
     updateUserStatus,
     updateUserRole,
     batchOperation,

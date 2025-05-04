@@ -9,7 +9,15 @@ export function mapApiToVideoItem(apiData: ApiVideoResponse): VideoItem {
     views: apiData.viewCount,
     cover: apiData.coverImageUrl,
     url: apiData.filePath,
-    uploadTime: new Date(apiData.createdTime).toLocaleDateString('zh-CN'),
+    // src/utils/videoMapper.ts
+    uploadTime: new Date(apiData.createdTime).toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).replace(/\//g, '-'),
     status: apiData.status,
     likes: apiData.likeCount,
     comments: apiData.commentCount,
@@ -20,5 +28,6 @@ export function mapApiToVideoItem(apiData: ApiVideoResponse): VideoItem {
     tagsname: apiData.tags?.map(t => t.tagName) || [],
     tags: apiData.tags?.map(t => t.tagId) || [],
     type: apiData.type,
+    authorUrl:apiData.authorUrl
   }
 }

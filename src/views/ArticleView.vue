@@ -30,7 +30,7 @@
         <div class="author-info">
           <div class="author-meta">
             <img
-              :src="videoStore.currentVideo.author"
+              :src="videoStore.currentVideo.authorUrl"
               class="author-avatar"
               alt="作者头像"
             >

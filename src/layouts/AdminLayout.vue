@@ -43,11 +43,18 @@ const adminLinks = ref([
     meta: { title: '内容审核' }
   },
   {
+    path: '/admin/contentAdmin',
+    name: '内容管理',
+    icon: 'fas fa-file-tags',
+    meta: { title: '内容管理' }
+  },
+  {
     path: '/admin/tags',
     name: '标签管理',
     icon: 'fas fa-file-tags',
-    meta: { title: '内容审核' }
+    meta: { title: '标签管理' }
   }
+
 ])
 </script>
 

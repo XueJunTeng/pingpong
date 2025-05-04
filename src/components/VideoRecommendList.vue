@@ -16,18 +16,19 @@
 <script setup lang="ts">
 import VideoCard from '@/components/VideoCard.vue'
 import { useVideoStore } from '@/stores/videoStore'
-import { computed } from 'vue'
+import {computed, onMounted} from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const videoStore = useVideoStore()
 
+onMounted(async () => {
+  await videoStore.fetchRelatedVideos(Number(route.params.contentId))
+})
 
 // 过滤当前正在观看的视频
 const filteredVideos = computed(() => {
-  return videoStore.reVideos.filter(
-    v => v.contentId !== Number(route.params.contentId)
-  )
+  return videoStore.relatedVideos
 })
 </script>
 

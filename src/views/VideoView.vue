@@ -22,6 +22,7 @@
             <div class="video-player-container">
               <video
                 controls
+                autoplay
                 class="bilibili-player"
                 poster="https://s1.hdslb.com/bfs/static/jinkela/video/asserts/poster.png"
               >
@@ -37,7 +38,7 @@
               <div class="author-row">
                 <div class="author-info">
                   <img
-                    :src="videoStore.currentVideo.author"
+                    :src="videoStore.currentVideo.authorUrl"
                     class="author-avatar"
                     alt="作者头像"
                   >
@@ -227,9 +228,10 @@ const handleFavorite = () => {
 
 .detail-layout {
   display: grid;
-  grid-template-columns: 1fr minmax(0, 960px) 300px;
+  grid-template-columns: 1fr minmax(0, 960px) 350px;
   gap: 40px;
   justify-content: center;
+
 }
 
 .main-content {

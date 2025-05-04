@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import request from '@/api/request'
 import type { RegisterData, LoginData, AuthResponse, UserProfileUpdate } from '@/types/auth'
-
+import { AxiosError } from 'axios';
 interface UserInfo {
   userId: number
   username: string
@@ -13,24 +13,25 @@ interface UserInfo {
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: localStorage.getItem('token') || null,
-    userInfo: JSON.parse(localStorage.getItem('userInfo') || 'null') as UserInfo | null
+    // 改为从 sessionStorage 初始化
+    token: sessionStorage.getItem('token') || null,
+    userInfo: JSON.parse(sessionStorage.getItem('userInfo') || 'null') as UserInfo | null
   }),
 
   actions: {
     async userlogout() {
-      // 清除客户端所有认证痕迹
-      localStorage.removeItem('token')
-      sessionStorage.clear()
-
-      // 清除 Cookies（如果使用）
-      document.cookie = 'token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;'
+      // 清除当前会话的存储
+      sessionStorage.removeItem('token')
+      sessionStorage.removeItem('userInfo')
 
       // 清除内存中的 token
       this.token = null
       this.userInfo = null
 
-      console.log('用户已注销，所有认证信息已清除')
+      // 清除 Cookies（如果使用）
+      document.cookie = 'token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;'
+
+      console.log('当前窗口会话已注销')
     },
 
     // 注册操作（保持不变）
@@ -146,10 +147,10 @@ export const useAuthStore = defineStore('auth', {
       return new Error(`${action}失败: ${errorMessage}`)
     },
 
-    // 保持不变的存储操作方法...
+    // 修改存储方式为 sessionStorage
     persistToStorage() {
-      localStorage.setItem('token', this.token || '')
-      localStorage.setItem('userInfo', JSON.stringify(this.userInfo))
+      sessionStorage.setItem('token', this.token || '')
+      sessionStorage.setItem('userInfo', JSON.stringify(this.userInfo))
     },
 
     initializeFromStorage() {
@@ -172,15 +173,67 @@ export const useAuthStore = defineStore('auth', {
     },
 
     clearStorage() {
-      localStorage.removeItem('token')
-      localStorage.removeItem('userInfo')
+      sessionStorage.removeItem('token')
+      sessionStorage.removeItem('userInfo')
     },
-
     getErrorMessage(error: unknown): string {
-      if (error instanceof Error) return error.message
-      if (typeof error === 'string') return error
-      return '未知错误'
+  // 处理字符串类型的错误
+  if (typeof error === 'string') return error;
+
+  // 处理 Error 实例（包括 AxiosError）
+  if (error instanceof Error) {
+    // 如果是 Axios 错误，尝试解析响应体
+    if ('response' in error) {
+      const axiosError = error as AxiosError;
+      const responseData = axiosError.response?.data;
+
+      // 检查是否是后端返回的标准错误结构
+      if (
+        responseData &&
+        typeof responseData === 'object' &&
+        'message' in responseData
+      ) {
+        const messages: string[] = [];
+        const backendError = responseData as {
+          message: string;
+          data?: Record<string, string>;
+        };
+
+        // 添加顶层错误信息
+        messages.push(backendError.message);
+
+        // 添加字段级错误信息
+        if (backendError.data) {
+          messages.push(...Object.values(backendError.data));
+        }
+
+        return messages.join('；');
+      }
     }
+    return error.message;
+  }
+
+  // 处理直接传入后端错误对象的情况
+  if (typeof error === 'object' && error !== null) {
+    const messages: string[] = [];
+    const backendError = error as { message?: string; data?: Record<string, string> };
+
+    // 添加顶层错误信息
+    if (backendError.message) {
+      messages.push(backendError.message);
+    }
+
+    // 添加字段级错误信息
+    if (backendError.data) {
+      messages.push(...Object.values(backendError.data));
+    }
+
+    return messages.length > 0 ? messages.join('；') : '未知错误';
+  }
+
+  // 其他无法识别的错误类型
+  return '未知错误';
+}
   },
 
   getters: {

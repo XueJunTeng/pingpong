@@ -95,6 +95,7 @@ import FileUploader from '@/components/FileUploader.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import type { ContentUploadForm } from '@/types/content'
 import { useNavStore } from '@/stores/TagStore'
+import {ElMessage} from "element-plus";
 const navStore = useNavStore()
 const uploadStore = useUploadStore()
 onMounted(() => {
@@ -197,8 +198,11 @@ const submitForm = async () => {
     // 调用Store
     const contentId = await uploadStore.uploadContent(formData)
 
-    // 成功处理
-    alert(`文章发布成功！ID: ${contentId}`)
+    // 显示成功提示
+    ElMessage.success({
+      message: '上传成功',
+      duration: 2000
+    })
     resetForm()
     localStorage.removeItem('articleDraft')
 

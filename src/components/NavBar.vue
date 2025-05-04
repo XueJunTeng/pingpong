@@ -48,7 +48,7 @@
 import { useAuthStore } from '@/stores/auth'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { useNotificationsStore } from '@/stores/notifications'
 const notificationsStore = useNotificationsStore()
 const { totalUnread } = storeToRefs(notificationsStore)
@@ -76,13 +76,6 @@ const handleSearch = () => {
     searchInput.value.value = ''
   }
 }
-
-onMounted(async () => {
-    await notificationsStore.fetchUnreadCounts()
-    console.log('回复未读数:', notificationsStore.counts.replyComment);
-    console.log('点赞未读数:', notificationsStore.counts.like);
-    console.log('总未读数:', notificationsStore.totalUnread);
-})
 </script>
 
 <style lang="scss" scoped>
@@ -103,6 +96,7 @@ onMounted(async () => {
 
   /* 左侧Logo */
   .logo-link {
+    text-decoration: none;  // 新增这行
     .logo {
       font-size: 24px;
       font-weight: bold;
@@ -158,7 +152,7 @@ onMounted(async () => {
 
   /* 右侧菜单 */
   .right-menu {
-    margin-left: 78%;
+    margin-left: 72%;
     display: flex;
     align-items: center;
     gap: 25px;

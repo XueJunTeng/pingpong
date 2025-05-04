@@ -1,4 +1,3 @@
-<!-- src/views/admin/TagManagement.vue -->
 <template>
   <div class="management-container">
     <!-- 加载状态提示 -->
@@ -22,7 +21,6 @@
     <div class="header">
       <h2>标签管理</h2>
       <div class="actions">
-        <!-- 搜索输入 -->
         <el-input
           v-model="searchParams.keyword"
           placeholder="搜索标签..."
@@ -30,12 +28,7 @@
           clearable
           @change="handleSearch"
         />
-        <el-button
-          type="primary"
-          @click="openCreateDialog"
-        >
-          新建标签
-        </el-button>
+        <el-button type="primary" @click="openCreateDialog">新建标签</el-button>
         <el-button
           type="danger"
           :disabled="selectedTags.length === 0"
@@ -55,13 +48,27 @@
     >
       <el-table-column type="selection" width="55" />
       <el-table-column prop="tagName" label="标签名称" />
+      <el-table-column prop="usageCount" label="使用次数" width="120" align="center">
+        <template #default="{ row }">
+          <span class="usage-count">{{ row.usageCount }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="weight" label="权重" width="150">
+        <template #default="{ row }">
+          <div class="weight-control">
+            <el-input-number
+              v-model="row.weight"
+              :min="0"
+              :max="9999"
+              controls-position="right"
+              @change="(val) => updateWeight(row, val)"
+            />
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="120">
         <template #default="{ row }">
-          <el-button
-            size="small"
-            type="danger"
-            @click="deleteTag(row.tagId)"
-          >
+          <el-button size="small" type="danger" @click="deleteTag(row.tagId)">
             删除
           </el-button>
         </template>
@@ -81,29 +88,28 @@
     />
 
     <!-- 新建对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      title="新建标签"
-      width="500px"
-    >
-      <el-form
-        ref="formRef"
-        :model="formData"
-        :rules="formRules"
-        label-width="80px"
-      >
+    <el-dialog v-model="dialogVisible" title="新建标签" width="500px">
+      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="80px">
         <el-form-item label="标签名称" prop="tagName">
           <el-input
             v-model="formData.tagName"
             placeholder="请输入标签名称"
           />
         </el-form-item>
+        <el-form-item label="权重" prop="weight">
+          <el-input-number
+            v-model="formData.weight"
+            :min="0"
+            :max="9999"
+            :step="1"
+            controls-position="right"
+            style="width: 200px"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="createTag">
-          确认
-        </el-button>
+        <el-button type="primary" @click="createTag">确认</el-button>
       </template>
     </el-dialog>
   </div>
@@ -115,7 +121,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useTagStore } from '@/stores/TagStore'
 import type { Tag } from '@/stores/TagStore'
 
-// Store
 const tagStore = useTagStore()
 
 // 初始化加载数据
@@ -141,7 +146,8 @@ const currentPage = computed({
 const dialogVisible = ref(false)
 const formRef = ref()
 const formData = ref({
-  tagName: ''
+  tagName: '',
+  weight: 1 // 默认权重值
 })
 
 // 表单验证规则
@@ -149,15 +155,24 @@ const formRules = {
   tagName: [
     { required: true, message: '请输入标签名称', trigger: 'blur' },
     { min: 2, max: 20, message: '长度在2到20个字符', trigger: 'blur' }
+  ],
+  weight: [
+    { required: true, message: '请输入权重值', trigger: 'blur' },
+    {
+      type: 'number',
+      min: 0,
+      max: 9999,
+      message: '权重值需在0-9999之间',
+      trigger: 'blur'
+    }
   ]
 }
 
-// 分页变化处理
+// 分页处理
 const handlePageChange = (page: number) => {
   currentPage.value = page
 }
 
-// 每页数量变化
 const handleSizeChange = (size: number) => {
   tagStore.currentPagination.pageSize = size
   tagStore.fetchTags()
@@ -172,15 +187,19 @@ const handleSearch = () => {
 
 // 打开创建对话框
 const openCreateDialog = () => {
-  formData.value = { tagName: '' }
+  formData.value = { tagName: '', weight: 1 }
   dialogVisible.value = true
 }
 
 // 创建标签
 const createTag = async () => {
   try {
+    console.log('提交数据:', JSON.stringify(formData.value)) // 关键调试点
     await formRef.value.validate()
-    await tagStore.createTag(formData.value.tagName)
+    await tagStore.createTag(
+      formData.value.tagName,
+      formData.value.weight
+  )
     ElMessage.success('标签创建成功')
     dialogVisible.value = false
   } catch (error) {
@@ -188,7 +207,7 @@ const createTag = async () => {
   }
 }
 
-// 删除单个标签
+// 删除标签
 const deleteTag = async (tagId: number) => {
   try {
     await ElMessageBox.confirm('确定要删除该标签吗？', '警告', {
@@ -213,9 +232,11 @@ const batchDeleteTags = async () => {
   if (selectedTags.value.length === 0) return
 
   try {
-    await ElMessageBox.confirm(`确定要删除选中的${selectedTags.value.length}个标签吗？`, '警告', {
-      type: 'warning'
-    })
+    await ElMessageBox.confirm(
+      `确定要删除选中的${selectedTags.value.length}个标签吗？`,
+      '警告',
+      { type: 'warning' }
+    )
     await tagStore.batchDeleteTags(selectedTags.value)
     ElMessage.success('批量删除成功')
     selectedTags.value = []
@@ -223,6 +244,17 @@ const batchDeleteTags = async () => {
     if (error !== 'cancel') {
       ElMessage.error('批量删除失败')
     }
+  }
+}
+
+// 更新权重
+const updateWeight = async (tag: Tag, newWeight: number) => {
+  try {
+    await tagStore.updateTagWeight(tag.tagId, newWeight)
+    ElMessage.success('权重更新成功')
+  } catch (error) {
+    ElMessage.error('权重更新失败')
+    tag.weight = tag._prevWeight // 回滚值
   }
 }
 </script>
@@ -255,5 +287,24 @@ const batchDeleteTags = async () => {
 
 .el-table {
   margin-top: 16px;
+}
+
+.weight-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  :deep(.el-input-number) {
+    width: 120px;
+
+    .el-input__inner {
+      text-align: center;
+    }
+  }
+}
+
+.usage-count {
+  font-weight: 500;
+  color: #666;
 }
 </style>

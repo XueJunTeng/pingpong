@@ -7,6 +7,7 @@ type CommentDTO = {
   content: string
   username: string
   createTime: string
+  avatarUrl: string
   replies: CommentDTO[]
 }
 

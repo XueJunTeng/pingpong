@@ -6,6 +6,8 @@ import type { AxiosError } from 'axios'
 export interface Tag {
   tagId: number
   tagName: string
+  usageCount: number
+  weight: number
 }
 
 export const useNavStore = defineStore('subNavbar', () => {
@@ -93,10 +95,13 @@ export const useTagStore = defineStore('tagManagement', () => {
     }
   }
 
-  const createTag = async (tagName: string) => {
+  const createTag = async (tagName: string,weight:number) => {
+    console.log('请求参数:', JSON.stringify({ tagName, weight })) // 调试关键点
+
     try {
       const { data } = await axiosInstance.post('/api/admin/tags', {
-        tagName
+        tagName,
+        weight
       })
 
       await fetchTags()
@@ -143,6 +148,27 @@ export const useTagStore = defineStore('tagManagement', () => {
     searchParams.value.keyword = keyword
   }
 
+  // 新增权重更新方法
+  const updateTagWeight = async (tagId: number, weight: number) => {
+    try {
+      error.value = null
+      await axiosInstance.put(`/api/admin/tags/${tagId}/weight`, { weight })
+
+      // 本地更新优化：直接修改对应标签的权重值
+      const targetTag = tagList.value.find(tag => tag.tagId === tagId)
+      if (targetTag) {
+        targetTag.weight = weight
+      }
+
+      // 如果需要严格保持数据最新，可以调用fetchTags()
+      // await fetchTags()
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>
+      error.value = axiosError.response?.data?.message || '权重更新失败'
+      throw err
+    }
+  }
+
   return {
     // State
     tagList,
@@ -157,6 +183,7 @@ export const useTagStore = defineStore('tagManagement', () => {
     deleteTag,
     batchDeleteTags,
     updatePagination,
-    updateSearchKeyword
+    updateSearchKeyword,
+    updateTagWeight // 导出新方法
   }
 })

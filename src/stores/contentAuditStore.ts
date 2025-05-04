@@ -50,6 +50,7 @@ export const useContentAuditStore = defineStore('contentAudit', () => {
           pageSize,
           keyword,
           type: contentType // 根据后端 API 字段名称调整
+
         }
       })
 
@@ -68,6 +69,41 @@ export const useContentAuditStore = defineStore('contentAudit', () => {
       updatePagination(response.data)
     } catch (err) {
       error.value = '获取待审内容失败'
+      console.error('API Error:', err)
+    } finally {
+      loading.value = false
+    }
+  }
+  const fetchContentsList = async (params: FetchParams = {}) => {
+    try {
+      loading.value = true
+      const { page = 1, pageSize = 10, keyword, contentType } = params
+
+      const response = await api.get<PaginationResponse>('/api/admin/contents/list', {
+        params: {
+          page,
+          pageSize,
+          keyword,
+          type: contentType // 根据后端 API 字段名称调整
+
+        }
+      })
+
+      // 处理作者信息
+      const enrichedList = await Promise.all(
+        response.data.list.map(async (item) => ({
+          ...item,
+          author: item.author,
+          createdTime: formatDateTime(item.createdTime),
+          lastModifiedTime: formatDateTime(item.lastModifiedTime),
+          type: item.type
+        }))
+      )
+
+      pendingContents.value = enrichedList
+      updatePagination(response.data)
+    } catch (err) {
+      error.value = '获取内容失败'
       console.error('API Error:', err)
     } finally {
       loading.value = false
@@ -133,6 +169,27 @@ export const useContentAuditStore = defineStore('contentAudit', () => {
       return '无效时间'
     }
   }
+  const deleteContent = async (contentId: number) => {
+    try {
+      await api.delete(`/api/admin/contents/${contentId}`)
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>
+      error.value = axiosError.response?.data?.message || '删除内容失败'
+      throw err
+    }
+  }
+
+  const batchDeleteContents = async (contentIds: number[]) => {
+    try {
+      await api.post('/api/admin/contents/batch-delete', {
+        contentIds // 参数名需要与后端接口一致
+      })
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>
+      error.value = axiosError.response?.data?.message || '批量删除内容失败'
+      throw err
+    }
+  }
 
   return {
     pendingContents,
@@ -141,6 +198,9 @@ export const useContentAuditStore = defineStore('contentAudit', () => {
     error,
     formatDateTime,
     fetchPendingContents,
-    auditContent
+    auditContent,
+    fetchContentsList,
+    deleteContent,
+    batchDeleteContents,
   }
 })

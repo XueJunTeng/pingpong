@@ -1,5 +1,3 @@
-<!-- src/views/HomeView.vue -->
-<!-- src/views/HomeView.vue -->
 <template>
   <div class="home-page">
     <!-- 轮播图组件 -->
@@ -7,14 +5,24 @@
 
     <!-- 二级导航栏组件 -->
     <SubNavbar/>
-        <!-- 推荐标题 -->
-        <div class="recommend-header">
-      <h2 class="title">
-        <span class="highlight">精选推荐</span>
-        <span class="en-title">Featured Videos</span>
-      </h2>
+
+    <!-- 推荐标题区域 -->
+    <div class="recommend-header">
+      <div class="header-container">
+        <h2 class="title">
+          <span class="highlight">精选推荐</span>
+          <span class="en-title">Featured Videos</span>
+        </h2>
+        <!-- 过滤开关 -->
+        <div class="filter-switch">
+          <span class="switch-label">过滤已观看</span>
+          <BiliSwitch :modelValue="videoStore.filterViewed"
+                      @update:modelValue="val => videoStore.setFilterViewed(val)" />
+        </div>
+      </div>
       <div class="decorative-line"></div>
     </div>
+
     <!-- 视频列表组件 -->
     <VideoList
       :videos="videoStore.reVideos"
@@ -26,14 +34,21 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import Carousel from '@/components/CarouselOne.vue'
 import SubNavbar from '@/components/SubNavbar.vue'
 import VideoList from '@/components/VideoList.vue'
+import BiliSwitch from '@/components/BiliSwitch.vue'
 import { useVideoStore } from '@/stores/videoStore'
 
 const videoStore = useVideoStore()
-
+// 监听状态变化
+watch(
+  () => videoStore.filterViewed,
+  () => {
+    videoStore.fetchcontents()
+  }
+)
 onMounted(async () => {
   await videoStore.fetchcontents()
 })
@@ -46,16 +61,24 @@ onMounted(async () => {
   padding-bottom: 40px;
 
   .recommend-header {
-    text-align: center;
-    margin: 10px 0 30px;
+    max-width: 1280px;
+    margin: 30px auto 20px;
+    padding: 0 20px;
     position: relative;
+
+    .header-container {
+      position: relative;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
 
     .title {
       font-size: 2.5rem;
       color: #2d3748;
-      margin-bottom: 1rem;
-      position: relative;
       display: inline-block;
+      position: relative;
+      margin: 0 auto;
+      padding: 0 120px; /* 为开关留出空间 */
 
       .highlight {
         position: relative;
@@ -83,11 +106,33 @@ onMounted(async () => {
       }
     }
 
+    .filter-switch {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      z-index: 2;
+
+      .switch-label {
+        font-size: 14px;
+        color: #2d3748;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+    }
+
     .decorative-line {
       width: 120px;
       height: 2px;
       background: linear-gradient(90deg, transparent, #00aeec, transparent);
-      margin: 0 auto;
+      margin: 10px auto 0;
       opacity: 0.6;
     }
   }
@@ -95,18 +140,43 @@ onMounted(async () => {
   // 响应式调整
   @media (max-width: 768px) {
     .recommend-header {
-      margin: 30px 0 20px;
+      padding: 0 15px;
+      margin: 20px auto;
 
       .title {
         font-size: 1.8rem;
+        padding: 0 90px;
 
         .en-title {
           font-size: 0.8rem;
         }
       }
 
+      .filter-switch {
+        padding: 6px 12px;
+
+        .switch-label {
+          font-size: 12px;
+        }
+      }
+
       .decorative-line {
         width: 80px;
+      }
+    }
+  }
+
+  @media (max-width: 480px) {
+    .recommend-header {
+      .title {
+        padding: 0 60px;
+        font-size: 1.5rem;
+      }
+
+      .filter-switch {
+        .switch-label {
+          display: none;
+        }
       }
     }
   }

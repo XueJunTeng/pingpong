@@ -25,6 +25,7 @@ export interface ApiVideoResponse {
   author: string
   isLiked: boolean
   isFavorited: boolean
+  authorUrl: string
 }
 
 export interface VideoItem {
@@ -46,6 +47,7 @@ export interface VideoItem {
   isLiked: boolean
   isFavorited: boolean
   description: string
+  authorUrl?: string
 }
 export interface PaginatedContentResponse<T = VideoItem> {
   list: T[]             // 当前页数据列表

@@ -1,5 +1,4 @@
 <template>
-  <!-- 模板部分保持不变，与原始代码相同 -->
   <div class="notifications-container">
     <!-- 左侧导航 -->
     <div class="nav-sidebar">
@@ -26,6 +25,15 @@
             {{ counts.like }}
           </span>
         </el-menu-item>
+
+        <!-- 系统通知 -->
+        <el-menu-item index="SYSTEM">
+          <el-icon><Bell /></el-icon>
+          <span>系统通知</span>
+          <span v-if="counts.system > 0" class="unread-count">
+            {{ counts.system }}
+          </span>
+        </el-menu-item>
       </el-menu>
     </div>
 
@@ -37,52 +45,95 @@
             v-for="item in filteredNotifications"
             :key="item.notificationId"
             class="notification-item"
-            :class="{ unread: !item.isRead }"
+            :class="{
+              unread: !item.isRead,
+              'system-item': activeTab === 'SYSTEM'
+            }"
             @click="markAsRead(item)"
           >
-            <div class="avatar-wrapper">
-              <el-avatar
-                :src="item.senderAvatarUrl || '/default-avatar.png'"
-                :size="40"
-              />
-              <div class="notification-icon">
-                <component
-                  :is="typeIcons[item.type]"
-                  v-if="typeIcons[item.type]"
-                />
+            <!-- 系统通知模板 -->
+            <template v-if="activeTab === 'SYSTEM'">
+              <div class="system-icon">
+                <el-icon :color="getSystemIconColor(item)">
+                  <component :is="getSystemIcon(item)" />
+                </el-icon>
               </div>
-            </div>
-
-            <div class="content-wrapper">
-              <div class="content-header">
-                <span class="username">{{ item.senderUsername }}</span>
-                <span class="time">{{ formatTime(item.createdTime) }}</span>
-                <el-tag
-                  v-if="activeTab === 'REPLY_AND_COMMENT'"
-                  size="small"
-                  :type="item.type === 'COMMENT' ? 'primary' : 'success'"
-                  class="type-tag"
-                >
-                  {{ itemTypeMap[item.type as keyof ItemTypeMap] || '消息' }}
-                </el-tag>
-              </div>
-              <div class="content-body">
-                <div class="message-text">{{ item.message }}</div>
-                <template v-if="item.commentContent">
-                  <div class="comment-preview">
-                    {{ item.commentContent }}
+              <div class="content-wrapper">
+                <div class="content-header">
+                  <span class="time">{{ formatTime(item.createdTime) }}</span>
+                </div>
+                <div class="content-body">
+                  <!-- 驳回通知标题展示 -->
+                  <div v-if="item.contentStatus === 'REJECTED'" class="content-title">
+                    标题：{{ item.contentTitle }}
                   </div>
-                </template>
-                <el-link
-                  v-if="item.contentTitle"
-                  type="info"
-                  class="content-link"
-                  @click.stop="navigateToContent(item)"
-                >
-                  查看内容：{{ item.contentTitle }}
-                </el-link>
+
+                  <div class="message-text">
+                    {{ item.message }}
+                    <span class="status-tag">
+                   （状态：{{ getStatusText(item.contentStatus) }}）
+                  </span>
+                  </div>
+
+                  <!-- 正常审核通过的跳转链接 -->
+                  <el-link
+                    v-if="showContentLink(item)"
+                    type="info"
+                    class="content-link"
+                    @click.stop="navigateToContent(item)"
+                  >
+                    查看内容：{{ item.contentTitle }}
+                  </el-link>
+                </div>
               </div>
-            </div>
+            </template>
+
+            <!-- 普通通知模板 -->
+            <template v-else>
+              <div class="avatar-wrapper">
+                <el-avatar
+                  :src="item.senderAvatarUrl || '/default-avatar.png'"
+                  :size="40"
+                />
+                <div class="notification-icon">
+                  <component
+                    :is="typeIcons[item.type]"
+                    v-if="typeIcons[item.type]"
+                  />
+                </div>
+              </div>
+
+              <div class="content-wrapper">
+                <div class="content-header">
+                  <span class="username">{{ item.senderUsername }}</span>
+                  <span class="time">{{ formatTime(item.createdTime) }}</span>
+                  <el-tag
+                    v-if="activeTab === 'REPLY_AND_COMMENT'"
+                    size="small"
+                    :type="item.type === 'COMMENT' ? 'primary' : 'success'"
+                    class="type-tag"
+                  >
+                    {{ itemTypeMap[item.type as keyof ItemTypeMap] || '消息' }}
+                  </el-tag>
+                </div>
+                <div class="content-body">
+                  <div class="message-text">{{ item.message }}</div>
+                  <template v-if="item.commentContent">
+                    <div class="comment-preview">
+                      {{ item.commentContent }}
+                    </div>
+                  </template>
+                  <el-link
+                    v-if="item.contentTitle"
+                    type="info"
+                    class="content-link"
+                    @click.stop="navigateToContent(item)"
+                  >
+                    查看内容：{{ item.contentTitle }}
+                  </el-link>
+                </div>
+              </div>
+            </template>
           </div>
         </template>
 
@@ -113,22 +164,20 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChatDotRound, Goods } from '@element-plus/icons-vue'
+import { ChatDotRound, Goods, Bell, CircleCheck, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
 import type { Component } from 'vue'
 import request from '@/api/request'
-// 新增导入
 import { useNotificationsStore } from '@/stores/notifications'
-// 在 setup 部分初始化 store
-const notificationsStore = useNotificationsStore()
+
 interface Notification {
   notificationId: number
   senderId: number
   receiverId: number
   contentId: number
   commentId: number | null
-  type: 'LIKE' | 'REPLY' | 'COMMENT'
+  type: 'LIKE' | 'REPLY' | 'COMMENT' | 'SYSTEM'
   message: string
   isRead: boolean
   createdTime: string
@@ -137,13 +186,7 @@ interface Notification {
   contentTitle: string
   commentContent: string | null
   contentType: string
-}
-
-interface UnreadCountsResponse {
-  replyComment?: number
-  reply_comment?: number
-  like?: number
-  like_count?: number
+  contentStatus?: 'APPROVED' | 'REJECTED' | 'PENDING'
 }
 
 interface ItemTypeMap {
@@ -153,13 +196,13 @@ interface ItemTypeMap {
 
 const route = useRoute()
 const router = useRouter()
+const notificationsStore = useNotificationsStore()
 
-// 会话期未读ID集合
 const sessionUnreadIds = ref<Set<number>>(new Set())
 const isMounted = ref(false)
 let abortController: AbortController | null = null
 
-// 响应式数据
+// 响应式状态
 const activeTab = ref('REPLY_AND_COMMENT')
 const loading = ref(false)
 const filteredNotifications = ref<Notification[]>([])
@@ -171,7 +214,8 @@ const pageSize = ref(10)
 const typeIcons: Record<string, Component> = {
   LIKE: Goods,
   REPLY: ChatDotRound,
-  COMMENT: ChatDotRound
+  COMMENT: ChatDotRound,
+  SYSTEM: Bell
 }
 
 const itemTypeMap: ItemTypeMap = {
@@ -179,12 +223,14 @@ const itemTypeMap: ItemTypeMap = {
   REPLY: '回复'
 }
 
-// 初始化计数数据
+// 初始化计数
 const counts = ref({
   replyComment: 0,
-  like: 0
+  like: 0,
+  system: 0
 })
 
+// 核心数据加载
 const loadData = async () => {
   if (!isMounted.value) return
 
@@ -212,31 +258,30 @@ const loadData = async () => {
 
     if (!isMounted.value) return
 
-    // 初始化会话期未读ID
+    // 初始化未读ID
     const initialUnreadIds = notificationsRes.data.list
       .filter(item => !item.isRead)
       .map(item => item.notificationId)
-
     sessionUnreadIds.value = new Set(initialUnreadIds)
 
-    // 更新通知列表（保持原始未读状态）
+    // 处理通知列表
     filteredNotifications.value = notificationsRes.data.list.map(item => ({
       ...item,
-      isRead: item.isRead, // 保持服务器返回的状态
+      isRead: item.isRead,
       senderAvatarUrl: item.senderAvatarUrl || '/default-avatar.png',
       commentContent: item.commentContent || null
     }))
 
     total.value = notificationsRes.data.total
 
-    // 替换原有的 counts.value 赋值代码
+    // 更新计数
     const newCounts = {
       replyComment: Number(countsRes.data.data.replyComment ?? 0),
-      like: Number(countsRes.data.data.like ?? 0)
+      like: Number(countsRes.data.data.like ?? 0),
+      system: Number(countsRes.data.data.system ?? 0)
     }
     counts.value = newCounts
-    notificationsStore.updateCounts(newCounts) // 同步到 store
-
+    notificationsStore.updateCounts(newCounts)
 
   } catch (error: unknown) {
     handleError(error)
@@ -245,6 +290,32 @@ const loadData = async () => {
   }
 }
 
+// 系统通知相关方法
+const getSystemIcon = (item: Notification): Component => {
+  return item.contentStatus === 'APPROVED' ? CircleCheck : Warning
+}
+
+const getSystemIconColor = (item: Notification): string => {
+  return item.contentStatus === 'APPROVED' ? '#67C23A' : '#E6A23C'
+}
+
+const showContentLink = (item: Notification): boolean => {
+  // 仅审核通过且存在标题时显示链接
+  return item.contentStatus === 'APPROVED' && !!item.contentTitle
+}
+
+const getStatusText = (status?: string): string => {
+  switch(status?.toUpperCase()) {
+    case 'APPROVED': return '已通过'
+    case 'REJECTED': return '已驳回'
+    case 'PENDING': return '审核中'
+    default: return '未知状态'
+  }
+}
+
+// 公共方法
+const formatTime = (time: string) => dayjs(time).format('MM-DD HH:mm')
+
 const handleError = (error: unknown) => {
   if (error instanceof Error && error.name === 'AbortError') return
   console.error('请求错误:', error)
@@ -252,13 +323,15 @@ const handleError = (error: unknown) => {
 }
 
 const getNotificationTypes = (): string[] => {
-  return activeTab.value === 'REPLY_AND_COMMENT'
-    ? ['COMMENT', 'REPLY']
-    : ['LIKE']
+  switch(activeTab.value) {
+    case 'REPLY_AND_COMMENT': return ['COMMENT', 'REPLY']
+    case 'LIKE': return ['LIKE']
+    case 'SYSTEM': return ['SYSTEM']
+    default: return []
+  }
 }
 
-const formatTime = (time: string) => dayjs(time).format('MM-DD HH:mm')
-
+// 导航处理
 const navigateToContent = (item: Notification) => {
   if (!item.contentId || !item.contentType) {
     return ElMessage.warning('内容参数不完整')
@@ -280,14 +353,13 @@ const navigateToContent = (item: Notification) => {
   })
 }
 
+// 事件处理
 const handleTabChange = (tab: string) => {
   if (tab === activeTab.value) return
 
   activeTab.value = tab
   currentPage.value = 1
-  router.replace({
-    query: { ...route.query, type: tab }
-  }).catch(() => {})
+  router.replace({ query: { ...route.query, type: tab } }).catch(() => {})
   loadData()
 }
 
@@ -298,42 +370,11 @@ const handlePageChange = (page: number) => {
 
 const markAsRead = (item: Notification) => {
   if (!item.isRead && sessionUnreadIds.value.has(item.notificationId)) {
-    // 更新本地状态
     const updatedNotifications = filteredNotifications.value.map(n =>
-      n.notificationId === item.notificationId
-        ? { ...n, isRead: true }
-        : n
+      n.notificationId === item.notificationId ? { ...n, isRead: true } : n
     )
     filteredNotifications.value = updatedNotifications
-
-    // 从未读集合中移除
     sessionUnreadIds.value.delete(item.notificationId)
-
-  }
-}
-
-// 退出时处理剩余未读消息
-const handleBeforeUnmount = async () => {
-  isMounted.value = false
-  abortController?.abort()
-
-  try {
-    // 提交剩余未读消息
-    if (sessionUnreadIds.value.size > 0) {
-      await request.post('/api/notifications/batch-read', {
-        ids: Array.from(sessionUnreadIds.value)
-      })
-    }
-
-  // 替换原有的 counts.value 更新代码
-  const res = await request.get<UnreadCountsResponse>('/api/notifications/unread-counts')
-  const newCounts = {
-    replyComment: Number(res.data.replyComment ?? 0),
-    like: Number(res.data.like ?? 0)
-  }
-  notificationsStore.updateCounts(newCounts) // 同步到 store
-  } catch (error) {
-    console.error('退出处理失败:', error)
   }
 }
 
@@ -341,14 +382,34 @@ const handleBeforeUnmount = async () => {
 onMounted(() => {
   isMounted.value = true
   const routeType = route.query.type?.toString()
-  activeTab.value = routeType && ['REPLY_AND_COMMENT', 'LIKE'].includes(routeType)
+  activeTab.value = routeType && ['REPLY_AND_COMMENT', 'LIKE', 'SYSTEM'].includes(routeType)
     ? routeType
     : 'REPLY_AND_COMMENT'
   loadData()
 })
 
-onUnmounted(handleBeforeUnmount)
+onUnmounted(async () => {
+  isMounted.value = false
+  abortController?.abort()
 
+  try {
+    if (sessionUnreadIds.value.size > 0) {
+      await request.post('/api/notifications/batch-read', {
+        ids: Array.from(sessionUnreadIds.value)
+      })
+    }
+    const res = await request.get('/api/notifications/unread-counts')
+    notificationsStore.updateCounts({
+      replyComment: Number(res.data.replyComment ?? 0),
+      like: Number(res.data.like ?? 0),
+      system: Number(res.data.system ?? 0)
+    })
+  } catch (error) {
+    console.error('退出处理失败:', error)
+  }
+})
+
+// 路由监听
 watch(
   () => route.query.type,
   (newType) => {
@@ -362,7 +423,6 @@ watch(
 </script>
 
 <style scoped lang="scss">
-/* 样式部分保持不变，与原始代码相同 */
 .notifications-container {
   display: flex;
   max-width: 1200px;
@@ -449,6 +509,52 @@ watch(
             width: 3px;
             background: #00a1d6;
             border-radius: 2px 0 0 2px;
+          }
+
+          &.system-item::before {
+            background: #e6a23c;
+          }
+        }
+
+        &.system-item {
+          padding: 12px;
+          align-items: flex-start;
+
+          .system-icon {
+            margin-right: 16px;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 8px;
+
+            .el-icon {
+              font-size: 24px;
+            }
+          }
+
+          .content-wrapper {
+            flex: 1;
+
+            .message-text {
+              font-weight: 500;
+              color: #333;
+              display: flex;
+              align-items: center;
+
+              .status-tag {
+                color: #666;
+                font-size: 0.9em;
+                margin-left: 8px;
+
+                &::before {
+                  content: '•';
+                  margin-right: 4px;
+                }
+              }
+            }
+
+            .content-link {
+              margin-top: 8px;
+            }
           }
         }
 

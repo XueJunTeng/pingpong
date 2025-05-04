@@ -5,7 +5,11 @@ import type { VideoItem, ApiVideoResponse } from '@/types/video'
 import { mapApiToVideoItem } from '@/utils/videoMapper' // 使用现有映射函数
 import type { LikeResponse } from '@/types/like'
 import type { FavoriteResponse } from '@/types/favorite'
-import {convertToPureMetadata, type ApiRe, type contentItem} from '@/types/contentMetadata';
+import {
+  convertToPureMetadata,
+  type ApiRe,
+  type contentItem
+} from '@/types/contentMetadata';
 
 interface VideoState {
   contents: contentItem[]
@@ -16,16 +20,23 @@ interface VideoState {
   error: string | null
   reVideos:contentItem[]
   reArticles:contentItem[]
+  relatedContents: VideoItem[] // 新增相关推荐存储
+  relatedArticles:contentItem[]
+  relatedVideos:contentItem[]
   viewedContents: Set<number> // 记录已统计过浏览的内容ID
 }
 
 export const useVideoStore = defineStore('video', {
   state: (): VideoState => ({
+    filterViewed: false,
     contents: [],
     reVideos: [],
     reArticles: [],
     videos: [],
     results:[],
+    relatedContents:[],
+    relatedArticles:[],
+    relatedVideos:[],
     currentVideo: null,
     loading: false,
     error: null,
@@ -33,6 +44,10 @@ export const useVideoStore = defineStore('video', {
   }),
 
   actions: {
+    // 修改保存状态的方法
+    setFilterViewed(value: boolean) {
+      this.filterViewed = value
+    },
     //获取搜索结果
     async fetchsearch(query: string) {
       try {
@@ -48,12 +63,16 @@ export const useVideoStore = defineStore('video', {
         this.loading = false
       }
     },
-       // 获取内容列表
+       // 获取推荐内容列表
        async fetchcontents() {
         try {
           this.loading = true;
           this.error = null;
-          const response = await axiosInstance.get<ApiRe[]>('/api/recommend/real-time');
+          const response = await axiosInstance.get<ApiRe[]>('/api/recommend/real-time', {
+            params: {
+              filterViewed: this.filterViewed
+            }
+          });
 
           // 转换数据并保存原始列表
           this.contents = response.data.map(item => convertToPureMetadata(item));
@@ -70,6 +89,29 @@ export const useVideoStore = defineStore('video', {
           this.loading = false;
         }
       },
+    // 新增获取相关推荐方法
+    async fetchRelatedVideos(contentId: number) {
+      try {
+        this.error = null
+
+        const response = await axiosInstance.get<ApiVideoResponse[]>(
+          `/api/recommend/related/${contentId}`
+        )
+        // 数据转换并存储
+        this.relatedContents = response.data.map(item => mapApiToVideoItem(item))
+        console.log('relatedContents:',this.relatedContents);
+        this.relatedVideos = this.relatedContents.filter(item => item.type === 'VIDEO'); // 视频列表
+        this.relatedArticles = this.relatedContents.filter(item => item.type === 'ARTICLE'); // 文章列表
+        console.log('relatedVideos:',this.relatedVideos);
+
+      } catch (err: unknown) {
+        this.handleError(err, '推荐加载失败')
+        this.relatedVideos = [] // 失败时清空推荐列表
+        this.relatedArticles = [] // 失败时清空推荐列表
+        throw err
+      } finally {
+      }
+    },
     // 获取视频详情
     async fetchVideoDetail(contentId: number) {
       try {

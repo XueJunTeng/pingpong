@@ -154,11 +154,11 @@ const adminRoutes: RouteRecordRaw = {
       meta: { title: '内容审核' }
     },
     {
-      path: 'analytics',
-      name: 'DataAnalytics',
-      component: () => import('@/views/admin/DataAnalytics.vue'),
-      meta: { title: '数据分析' }
-    }
+      path: 'contentAdmin',
+      name: 'ContentAdmin',
+      component: () => import('@/views/admin/ContentAdmin.vue'),
+      meta: { title: '内容管理' }
+    },
   ]
 }
 

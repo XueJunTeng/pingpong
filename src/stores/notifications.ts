@@ -5,6 +5,7 @@ import axios from 'axios'
 interface UnreadCounts {
   replyComment: number
   like: number
+  system: number
 }
 
 export const useNotificationsStore = defineStore('notifications', {
@@ -12,14 +13,15 @@ export const useNotificationsStore = defineStore('notifications', {
     // 拆分未读数为独立字段
     counts: {
       replyComment: 0,
-      like: 0
+      like: 0,
+      system: 0
     } as UnreadCounts
   }),
 
   getters: {
     // 可选：计算总未读数
     totalUnread(): number {
-      return this.counts.replyComment + this.counts.like
+      return this.counts.replyComment + this.counts.like + this.counts.system
     }
   },
 
@@ -35,7 +37,8 @@ export const useNotificationsStore = defineStore('notifications', {
         if (
           response.status !== 200 ||
           typeof response.data.data?.replyComment !== 'number' ||
-          typeof response.data.data?.like !== 'number'
+          typeof response.data.data?.like !== 'number'||
+          typeof response.data.data?.system !== 'number'
         ) {
           throw new Error(`无效响应格式: ${JSON.stringify(response.data)}`)
         }
@@ -54,7 +57,8 @@ export const useNotificationsStore = defineStore('notifications', {
     updateCounts(newCounts: Partial<UnreadCounts>) {
       this.counts = {
         replyComment: Math.max(0, newCounts.replyComment ?? this.counts.replyComment),
-        like: Math.max(0, newCounts.like ?? this.counts.like)
+        like: Math.max(0, newCounts.like ?? this.counts.like),
+        system: Math.max(0, newCounts.system ?? this.counts.system)
       }
     },
 
@@ -73,7 +77,7 @@ export const useNotificationsStore = defineStore('notifications', {
 
     // 重置状态（可选）
     reset() {
-      this.counts = { replyComment: 0, like: 0 }
+      this.counts = { replyComment: 0, like: 0 , system: 0 }
     }
   }
 })

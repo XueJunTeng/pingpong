@@ -70,6 +70,7 @@ import FileUploader from '@/components/FileUploader.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import type { ContentUploadForm } from '@/types/content'
 import { useNavStore } from '@/stores/TagStore'
+import {ElMessage} from "element-plus";
 const navStore = useNavStore()
 onMounted(() => {
   navStore.fetchTags()
@@ -241,7 +242,11 @@ const submitForm = async () => {
       (progress) => (uploadProgress.value = progress)
     )
 
-    alert(`上传成功！内容ID: ${contentId}`)
+    // 显示成功提示
+    ElMessage.success({
+      message: '上传成功',
+      duration: 2000
+    })
     resetForm()
   } catch (error) {
     handleUploadError(error)
@@ -281,6 +286,7 @@ const resetForm = () => {
 
 .form-section {
   margin-bottom: 1.5rem;
+
 }
 
 label {

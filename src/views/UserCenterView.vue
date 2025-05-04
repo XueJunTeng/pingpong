@@ -61,24 +61,45 @@
           </div>
 
           <el-form
-            ref="usernameForm"
+            ref="profileFormRef"
             :model="userInfo"
-            :rules="usernameRules"
+            :rules="profileRules"
             label-width="100px"
           >
+            <!-- 用户名 -->
             <el-form-item label="用户名" prop="username">
-              <el-input
-                v-model="userInfo.username"
-                placeholder="请输入新用户名"
-                clearable
-              />
-              <el-button
-                type="primary"
-                class="submit-btn"
-                @click="updateUsername"
-              >
-                修改用户名
-              </el-button>
+              <div class="form-item-content">
+                <el-input
+                  v-model="userInfo.username"
+                  placeholder="请输入新用户名"
+                  clearable
+                />
+                <el-button
+                  type="primary"
+                  class="submit-btn"
+                  @click="updateProfile('username')"
+                >
+                  修改
+                </el-button>
+              </div>
+            </el-form-item>
+
+            <!-- 新增邮箱字段 -->
+            <el-form-item label="邮箱" prop="email">
+              <div class="form-item-content">
+                <el-input
+                  v-model="userInfo.email"
+                  placeholder="请输入新邮箱"
+                  clearable
+                />
+                <el-button
+                  type="primary"
+                  class="submit-btn"
+                  @click="updateProfile('email')"
+                >
+                  修改
+                </el-button>
+              </div>
             </el-form-item>
           </el-form>
         </el-card>
@@ -206,7 +227,8 @@ const activeTabText = computed(() => {
 // 用户信息
 const userInfo = reactive({
   avatar: authStore.currentUser?.avatar || '',
-  username: authStore.currentUser?.username || ''
+  username: authStore.currentUser?.username || '',
+  email: authStore.currentUser?.email || '' // 新增邮箱字段
 })
 
 // 密码表单
@@ -216,11 +238,15 @@ const passwordForm = reactive({
   confirmPassword: ''
 })
 
-// 表单验证规则
-const usernameRules = {
+// 新增验证规则
+const profileRules = {
   username: [
     { required: true, message: '用户名不能为空', trigger: 'blur' },
     { min: 2, max: 16, message: '长度在2到16个字符', trigger: 'blur' }
+  ],
+  email: [
+    { required: true, message: '请输入邮箱地址', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: ['blur', 'change'] }
   ]
 }
 
@@ -291,11 +317,18 @@ const beforeAvatarUpload = (file: File) => {
   return true
 }
 
-// 用户名更新
-const updateUsername = async () => {
+// 修改后的更新方法
+const profileFormRef = ref<FormInstance>()
+const updateProfile = async (field: 'username' | 'email') => {
   try {
-    await authStore.updateProfile({ username: userInfo.username })
-    ElMessage.success('用户名修改成功')
+    if (!profileFormRef.value) return
+    // 验证单个字段
+    await profileFormRef.value.validateField(field)
+    // 调用更新接口
+    await authStore.updateProfile({
+      [field]: userInfo[field]
+    })
+    ElMessage.success(`${field === 'username' ? '用户名' : '邮箱'}修改成功`)
   } catch (error: unknown) {
     ElMessage.error((error as Error).message || '更新失败')
   }
@@ -409,6 +442,16 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+.form-item-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.submit-btn {
+  flex-shrink: 0;
+  width: 80px;
+}
 // 退出按钮动画
 @keyframes shake {
   0% { transform: rotate(0deg); }

@@ -63,7 +63,8 @@ instance.interceptors.response.use(
       code: response?.status || -1,
       message: response?.data?.message || error.message,
       url: config?.url,
-      method: config?.method
+      method: config?.method,
+      data:response.data.data
     }
 
     console.error('API Error:', errorInfo)

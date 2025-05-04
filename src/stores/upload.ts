@@ -24,7 +24,7 @@ export const useUploadStore = defineStore('upload', () => {
       isSubmitting.value = true
       error.value = null
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('token')
       if (!token) {
         throw new Error('未授权，请登录')
       }
